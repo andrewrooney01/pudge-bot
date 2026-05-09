@@ -74,6 +74,15 @@ def process(audio_path: Path) -> None:
         f"{a['pause_ratio']:.2f}" if a["pause_ratio"] else "?",
     )
 
+    log.info("  generating insights...")
+    parsed, raw = insights.generate(t["text"], a)
+    log.info("  insight: [%s] %s", parsed.get("mood"), parsed.get("summary", "")[:80])
+
+    log.info("  sending iMessage...")
+    msg = notify.format_message(parsed, a)
+    notify.send(msg)
+
+    # Persist only after the full pipeline succeeds so a failed run is retried
     rec_id = db.insert_recording(
         audio_path,
         _recorded_at_from_path(audio_path),
@@ -81,15 +90,7 @@ def process(audio_path: Path) -> None:
     )
     db.save_transcript(rec_id, t["text"], t["language"])
     db.save_acoustic(rec_id, a)
-
-    log.info("  generating insights...")
-    parsed, raw = insights.generate(t["text"], a)
     db.save_insights(rec_id, parsed, raw)
-    log.info("  insight: [%s] %s", parsed.get("mood"), parsed.get("summary", "")[:80])
-
-    log.info("  sending iMessage...")
-    msg = notify.format_message(parsed, a)
-    notify.send(msg)
 
     log.info("✓ done: %s", audio_path.name)
 
