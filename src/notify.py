@@ -4,7 +4,10 @@ from config import IMESSAGE_RECIPIENT
 
 
 def _escape_applescript(s: str) -> str:
-    return s.replace("\\", "\\\\").replace('"', '\\"')
+    s = s.replace("\\", "\\\\").replace('"', '\\"')
+    # AppleScript string literals cannot contain literal newlines
+    s = s.replace("\n", '" & return & "')
+    return s
 
 
 def format_message(parsed: dict, acoustic: dict) -> str:
