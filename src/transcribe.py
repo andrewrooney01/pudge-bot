@@ -1,19 +1,50 @@
+import errno
 import shutil
 import tempfile
+import time
 from pathlib import Path
 
 import mlx_whisper
 
 from config import WHISPER_MODEL
 
+_ICLOUD_DIR = Path.home() / "Library" / "Mobile Documents"
+_SYNC_RETRIES = 6
+_SYNC_RETRY_DELAY = 5.0  # seconds; bird usually releases within 10-30s
+
 
 def _icloud_safe_copy(src: Path, dst: Path) -> None:
-    # macOS's shutil.copy2 → _fastcopy_fcopyfile path uses the fcopyfile()
-    # syscall, which trips EDEADLK against iCloud's sync lock the same way
-    # ffmpeg does. A plain read/write loop uses ordinary read() syscalls
-    # and avoids the lock contention.
-    with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
-        shutil.copyfileobj(fsrc, fdst, length=1024 * 1024)
+    # Uses read/write instead of fcopyfile() to avoid iCloud's sync lock.
+    #
+    # Two distinct EDEADLK causes:
+    #   1. Missing Full Disk Access — permanent failure; add the real Python
+    #      binary (not the venv symlink) to System Settings → Privacy &
+    #      Security → Full Disk Access.
+    #   2. bird actively syncing the file — transient; retry until it yields.
+    for attempt in range(_SYNC_RETRIES):
+        try:
+            with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+                shutil.copyfileobj(fsrc, fdst, length=1024 * 1024)
+            return
+        except OSError as e:
+            if e.errno != errno.EDEADLK:
+                raise
+            if attempt == _SYNC_RETRIES - 1:
+                raise PermissionError(
+                    f"iCloud sync lock on {src} did not release after "
+                    f"{_SYNC_RETRIES} retries. If this is a new file, "
+                    "wait longer. If it persists on old files, check Full "
+                    "Disk Access for the Python binary in System Settings."
+                ) from e
+            time.sleep(_SYNC_RETRY_DELAY)
+
+
+def _is_icloud_path(path: Path) -> bool:
+    try:
+        path.relative_to(_ICLOUD_DIR)
+        return True
+    except ValueError:
+        return False
 
 
 def transcribe(audio_path: Path) -> dict:
