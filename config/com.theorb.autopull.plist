@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.theorb.autopull</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/git</string>
+        <string>-C</string>
+        <string>/Users/PLACEHOLDER/Projects/the-orb</string>
+        <string>pull</string>
+        <string>--ff-only</string>
+        <string>origin</string>
+        <string>main</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/PLACEHOLDER/Projects/the-orb</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/PLACEHOLDER</string>
+    </dict>
+
+    <key>StartInterval</key>
+    <integer>60</integer>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/PLACEHOLDER/Projects/the-orb/logs/autopull.out</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/PLACEHOLDER/Projects/the-orb/logs/autopull.err</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
