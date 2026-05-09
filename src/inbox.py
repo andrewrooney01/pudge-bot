@@ -2,7 +2,7 @@ import logging
 import sqlite3
 
 import db
-from config import CHAT_DB_PATH, OWNER_HANDLE
+from config import CHAT_DB_PATH, OWNER_HANDLES
 
 log = logging.getLogger("orb.inbox")
 
@@ -47,17 +47,18 @@ def poll() -> list[dict]:
             log.info("inbox cursor initialized at ROWID %d", current)
             return []
 
+        placeholders = ",".join("?" * len(OWNER_HANDLES))
         rows = c.execute(
-            """SELECT m.ROWID AS rowid, m.text, m.date, h.id AS sender
+            f"""SELECT m.ROWID AS rowid, m.text, m.date, h.id AS sender
                FROM message m
                JOIN handle h ON m.handle_id = h.ROWID
                WHERE m.ROWID > ?
                  AND m.is_from_me = 0
                  AND m.text IS NOT NULL
                  AND m.text != ''
-                 AND h.id = ?
+                 AND h.id IN ({placeholders})
                ORDER BY m.ROWID ASC""",
-            (int(last_seen), OWNER_HANDLE),
+            (int(last_seen), *OWNER_HANDLES),
         ).fetchall()
 
         msgs = [dict(r) for r in rows]
