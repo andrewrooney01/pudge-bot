@@ -1,0 +1,13 @@
+data/
+logs/
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.local
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+philosophy.md
