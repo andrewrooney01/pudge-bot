@@ -1,6 +1,16 @@
+import os
 from pathlib import Path
 
 HOME = Path.home()
+
+# launchd starts processes with a stripped PATH; ensure subprocesses
+# (notably the `claude` CLI used by insights/query) can be resolved.
+os.environ["PATH"] = os.pathsep.join([
+    str(HOME / ".local" / "bin"),
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    os.environ.get("PATH", ""),
+])
 PROJECT = HOME / "Projects" / "the-orb"
 
 JPR_DIR = HOME / "Library" / "Mobile Documents" / \
