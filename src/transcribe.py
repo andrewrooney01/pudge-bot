@@ -1,5 +1,6 @@
 import errno
 import shutil
+import subprocess
 import tempfile
 import time
 from pathlib import Path
@@ -9,19 +10,33 @@ import mlx_whisper
 from config import WHISPER_MODEL
 
 _ICLOUD_DIR = Path.home() / "Library" / "Mobile Documents"
-_SYNC_RETRIES = 6
+_SYNC_RETRIES = 8
 _SYNC_RETRY_DELAY = 5.0  # seconds; bird usually releases within 10-30s
 
 
 def _icloud_safe_copy(src: Path, dst: Path) -> None:
-    # Uses read/write instead of fcopyfile() to avoid iCloud's sync lock.
+    # Background launchd daemons (ProcessType=Background) get EDEADLK when
+    # Python's read() hits bird's iCloud sync lock, even with Full Disk Access
+    # granted. Spawning /bin/cp as a child process sidesteps the lock because
+    # the child inherits FDA but runs in a fresh process context that bird
+    # doesn't hold a conflicting lock against.
     #
-    # Two distinct EDEADLK causes:
-    #   1. Missing Full Disk Access — permanent failure; add the real Python
-    #      binary (not the venv symlink) to System Settings → Privacy &
-    #      Security → Full Disk Access.
-    #   2. bird actively syncing the file — transient; retry until it yields.
+    # Falls back to a Python read/write loop with retries if cp itself fails.
     for attempt in range(_SYNC_RETRIES):
+        try:
+            result = subprocess.run(
+                ["/bin/cp", str(src), str(dst)],
+                capture_output=True,
+            )
+            if result.returncode == 0:
+                return
+            # cp failed — fall through to the Python fallback below
+            stderr = result.stderr.decode(errors="replace").strip()
+            if "Resource deadlock" not in stderr:
+                raise OSError(f"cp failed: {stderr}")
+        except Exception:
+            pass
+
         try:
             with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
                 shutil.copyfileobj(fsrc, fdst, length=1024 * 1024)
@@ -32,9 +47,8 @@ def _icloud_safe_copy(src: Path, dst: Path) -> None:
             if attempt == _SYNC_RETRIES - 1:
                 raise PermissionError(
                     f"iCloud sync lock on {src} did not release after "
-                    f"{_SYNC_RETRIES} retries. If this is a new file, "
-                    "wait longer. If it persists on old files, check Full "
-                    "Disk Access for the Python binary in System Settings."
+                    f"{_SYNC_RETRIES} retries. Check Full Disk Access for "
+                    "the Python binary in System Settings → Privacy & Security."
                 ) from e
             time.sleep(_SYNC_RETRY_DELAY)
 
