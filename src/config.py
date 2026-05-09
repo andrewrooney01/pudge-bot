@@ -6,6 +6,8 @@ PROJECT = HOME / "Projects" / "the-orb"
 JPR_DIR = HOME / "Library" / "Mobile Documents" / \
     "iCloud~com~openplanetsoftware~just-press-record" / "Documents"
 
+CHAT_DB_PATH = HOME / "Library" / "Messages" / "chat.db"
+
 DATA_DIR = PROJECT / "data"
 LOGS_DIR = PROJECT / "logs"
 CONFIG_DIR = PROJECT / "config"

@@ -46,6 +46,20 @@ CREATE TABLE IF NOT EXISTS philosophy_proposals (
     proposal TEXT,
     status TEXT DEFAULT 'pending'
 );
+
+CREATE TABLE IF NOT EXISTS state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS queries (
+    id INTEGER PRIMARY KEY,
+    received_at TEXT NOT NULL DEFAULT (datetime('now')),
+    sender TEXT,
+    question TEXT NOT NULL,
+    answer TEXT,
+    raw_response TEXT
+);
 """
 
 
@@ -131,6 +145,49 @@ def recent_insights(limit: int = 10):
         rows = c.execute(
             """SELECT r.recorded_at, i.summary, i.mood, i.themes
                FROM insights i JOIN recordings r ON r.id = i.recording_id
+               ORDER BY r.recorded_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_state(key: str) -> str | None:
+    with conn() as c:
+        row = c.execute(
+            "SELECT value FROM state WHERE key = ?", (key,)
+        ).fetchone()
+        return row["value"] if row else None
+
+
+def set_state(key: str, value: str) -> None:
+    with conn() as c:
+        c.execute(
+            "INSERT INTO state (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
+
+
+def save_query(question: str, answer: str, raw: str, sender: str | None = None) -> None:
+    with conn() as c:
+        c.execute(
+            "INSERT INTO queries (sender, question, answer, raw_response) "
+            "VALUES (?, ?, ?, ?)",
+            (sender, question, answer, raw),
+        )
+
+
+def reflections_snapshot(limit: int = 20) -> list[dict]:
+    with conn() as c:
+        rows = c.execute(
+            """SELECT r.id, r.recorded_at, r.duration_sec,
+                      t.text AS transcript,
+                      i.summary, i.mood, i.themes, i.pattern, i.question,
+                      a.speaking_rate_wpm, a.pause_ratio
+               FROM recordings r
+               LEFT JOIN transcripts t ON t.recording_id = r.id
+               LEFT JOIN insights i    ON i.recording_id = r.id
+               LEFT JOIN acoustic a    ON a.recording_id = r.id
                ORDER BY r.recorded_at DESC LIMIT ?""",
             (limit,),
         ).fetchall()
