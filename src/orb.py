@@ -12,6 +12,8 @@ import transcribe
 import acoustic
 import insights
 import notify
+import inbox
+import query
 
 
 logging.basicConfig(
@@ -95,21 +97,45 @@ def process(audio_path: Path) -> None:
     log.info("✓ done: %s", audio_path.name)
 
 
+def answer_question(msg: dict) -> None:
+    text = msg["text"]
+    log.info("Answering: %s", text[:80])
+    reply, raw = query.answer(text)
+    notify.send(reply)
+    db.save_query(text, reply, raw, sender=msg.get("sender"))
+    log.info("✓ answered (rowid=%s)", msg.get("rowid"))
+
+
 def main() -> int:
     db.init()
-    new = find_new_recordings()
-    if not new:
-        log.debug("no new recordings")
-        return 0
-
-    log.info("found %d new recording(s)", len(new))
     failures = 0
-    for path in new:
-        try:
-            process(path)
-        except Exception:
-            failures += 1
-            log.error("failed processing %s\n%s", path, traceback.format_exc())
+
+    new = find_new_recordings()
+    if new:
+        log.info("found %d new recording(s)", len(new))
+        for path in new:
+            try:
+                process(path)
+            except Exception:
+                failures += 1
+                log.error("failed processing %s\n%s", path, traceback.format_exc())
+    else:
+        log.debug("no new recordings")
+
+    questions = inbox.poll()
+    if questions:
+        log.info("found %d new message(s)", len(questions))
+        for msg in questions:
+            try:
+                answer_question(msg)
+            except Exception:
+                failures += 1
+                log.error(
+                    "failed answering rowid=%s\n%s",
+                    msg.get("rowid"),
+                    traceback.format_exc(),
+                )
+
     return failures
 
 
