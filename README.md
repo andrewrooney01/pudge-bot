@@ -21,6 +21,16 @@ Reply in the same thread to query your history:
 
 The orb answers using the full stored history.
 
+## Reminders
+
+Drop a reminder into any voice note or iMessage and the orb will fire it
+back later:
+
+- _"remind me in a couple of days to revisit the walk idea"_
+- _"tomorrow morning ping me about the dentist"_
+
+The orb extracts the intent, schedules it, and sends an iMessage when due.
+
 ## Status
 
 Proof of concept. Single user, runs on the user's Mac.

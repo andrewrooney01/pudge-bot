@@ -14,6 +14,7 @@ import insights
 import notify
 import inbox
 import query
+import reminders
 
 
 logging.basicConfig(
@@ -94,6 +95,15 @@ def process(audio_path: Path) -> None:
     db.save_acoustic(rec_id, a)
     db.save_insights(rec_id, parsed, raw)
 
+    try:
+        scheduled = reminders.extract_and_save(
+            t["text"], source="recording", source_id=rec_id
+        )
+        if scheduled:
+            log.info("  scheduled %d reminder(s) from recording", len(scheduled))
+    except Exception:
+        log.exception("  reminder extraction failed (non-fatal)")
+
     log.info("✓ done: %s", audio_path.name)
 
 
@@ -102,13 +112,29 @@ def answer_question(msg: dict) -> None:
     log.info("Answering: %s", text[:80])
     reply, raw = query.answer(text)
     notify.send(reply)
-    db.save_query(text, reply, raw, sender=msg.get("sender"))
+    query_id = db.save_query(text, reply, raw, sender=msg.get("sender"))
+    try:
+        scheduled = reminders.extract_and_save(
+            text, source="query", source_id=query_id
+        )
+        if scheduled:
+            log.info("  scheduled %d reminder(s) from query", len(scheduled))
+    except Exception:
+        log.exception("  reminder extraction failed (non-fatal)")
     log.info("✓ answered (rowid=%s)", msg.get("rowid"))
 
 
 def main() -> int:
     db.init()
     failures = 0
+
+    try:
+        fired = reminders.fire_due()
+        if fired:
+            log.info("fired %d due reminder(s)", fired)
+    except Exception:
+        failures += 1
+        log.error("failed firing reminders\n%s", traceback.format_exc())
 
     new = find_new_recordings()
     if new:

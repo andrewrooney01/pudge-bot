@@ -60,6 +60,19 @@ CREATE TABLE IF NOT EXISTS queries (
     answer TEXT,
     raw_response TEXT
 );
+
+CREATE TABLE IF NOT EXISTS reminders (
+    id INTEGER PRIMARY KEY,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    due_at TEXT NOT NULL,
+    text TEXT NOT NULL,
+    source TEXT,
+    source_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'pending',
+    sent_at TEXT
+);
+CREATE INDEX IF NOT EXISTS reminders_pending_due
+    ON reminders (status, due_at);
 """
 
 
@@ -168,13 +181,61 @@ def set_state(key: str, value: str) -> None:
         )
 
 
-def save_query(question: str, answer: str, raw: str, sender: str | None = None) -> None:
+def save_query(question: str, answer: str, raw: str, sender: str | None = None) -> int:
     with conn() as c:
-        c.execute(
+        cur = c.execute(
             "INSERT INTO queries (sender, question, answer, raw_response) "
             "VALUES (?, ?, ?, ?)",
             (sender, question, answer, raw),
         )
+        return cur.lastrowid
+
+
+def add_reminder(
+    text: str,
+    due_at: datetime,
+    source: str,
+    source_id: int | None = None,
+) -> int:
+    with conn() as c:
+        cur = c.execute(
+            "INSERT INTO reminders (text, due_at, source, source_id) "
+            "VALUES (?, ?, ?, ?)",
+            (text, due_at.isoformat(timespec="seconds"), source, source_id),
+        )
+        return cur.lastrowid
+
+
+def due_reminders() -> list[dict]:
+    with conn() as c:
+        rows = c.execute(
+            """SELECT id, text, due_at, source, source_id, created_at
+               FROM reminders
+               WHERE status = 'pending'
+                 AND datetime(due_at) <= datetime('now')
+               ORDER BY due_at ASC"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def mark_reminder_sent(reminder_id: int) -> None:
+    with conn() as c:
+        c.execute(
+            "UPDATE reminders SET status = 'sent', "
+            "sent_at = datetime('now') WHERE id = ?",
+            (reminder_id,),
+        )
+
+
+def pending_reminders() -> list[dict]:
+    with conn() as c:
+        rows = c.execute(
+            """SELECT id, text, due_at, created_at
+               FROM reminders
+               WHERE status = 'pending'
+               ORDER BY due_at ASC"""
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def reflections_snapshot(limit: int = 20) -> list[dict]:
