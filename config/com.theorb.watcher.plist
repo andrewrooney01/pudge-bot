@@ -34,7 +34,5 @@
     <key>StandardErrorPath</key>
     <string>/Users/andrewrooney/Projects/the-orb/logs/launchd.err</string>
 
-    <key>ProcessType</key>
-    <string>Background</string>
 </dict>
 </plist>
