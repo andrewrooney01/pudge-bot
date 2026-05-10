@@ -30,5 +30,8 @@ WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 
 IMESSAGE_RECIPIENT = "you@icloud.com"
 
+# Only messages from these iMessage handles are treated as questions for the orb.
+OWNER_HANDLES = ("+1XXXXXXXXXX", "you@icloud.com")
+
 for d in (DATA_DIR, LOGS_DIR, CONFIG_DIR):
     d.mkdir(parents=True, exist_ok=True)
