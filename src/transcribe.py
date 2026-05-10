@@ -14,14 +14,20 @@ _SYNC_RETRIES = 8
 _SYNC_RETRY_DELAY = 5.0  # seconds; bird usually releases within 10-30s
 
 
+def _brctl_download(src: Path) -> None:
+    # Ask bird to fully materialise the file before we read it.
+    # brctl download is idempotent — safe to call on already-local files.
+    subprocess.run(["/usr/bin/brctl", "download", str(src)], capture_output=True)
+    # Give bird a moment to release its write lock after the download
+    time.sleep(2.0)
+
+
 def _icloud_safe_copy(src: Path, dst: Path) -> None:
-    # Background launchd daemons (ProcessType=Background) get EDEADLK when
-    # Python's read() hits bird's iCloud sync lock, even with Full Disk Access
-    # granted. Spawning /bin/cp as a child process sidesteps the lock because
-    # the child inherits FDA but runs in a fresh process context that bird
-    # doesn't hold a conflicting lock against.
-    #
-    # Falls back to a Python read/write loop with retries if cp itself fails.
+    # iCloud files get EDEADLK from the launchd daemon's process context when
+    # bird holds a sync lock, even with Full Disk Access granted.
+    # Force bird to fully download/commit the file first, then copy.
+    _brctl_download(src)
+
     for attempt in range(_SYNC_RETRIES):
         try:
             result = subprocess.run(
@@ -30,12 +36,11 @@ def _icloud_safe_copy(src: Path, dst: Path) -> None:
             )
             if result.returncode == 0:
                 return
-            # cp failed — fall through to the Python fallback below
             stderr = result.stderr.decode(errors="replace").strip()
             if "Resource deadlock" not in stderr:
                 raise OSError(f"cp failed: {stderr}")
-        except Exception:
-            pass
+        except OSError:
+            raise
 
         try:
             with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
