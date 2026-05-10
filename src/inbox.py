@@ -2,7 +2,7 @@ import logging
 import sqlite3
 
 import db
-from config import CHAT_DB_PATH
+from config import CHAT_DB_PATH, OWNER_HANDLES
 
 log = logging.getLogger("orb.inbox")
 
@@ -47,21 +47,26 @@ def poll() -> list[dict]:
             log.info("inbox cursor initialized at ROWID %d", current)
             return []
 
+        placeholders = ",".join("?" * len(OWNER_HANDLES))
         rows = c.execute(
-            """SELECT m.ROWID AS rowid, m.text, m.date, h.id AS sender
+            f"""SELECT m.ROWID AS rowid, m.text, m.date, h.id AS sender
                FROM message m
-               LEFT JOIN handle h ON m.handle_id = h.ROWID
+               JOIN handle h ON m.handle_id = h.ROWID
                WHERE m.ROWID > ?
                  AND m.is_from_me = 0
                  AND m.text IS NOT NULL
                  AND m.text != ''
+                 AND h.id IN ({placeholders})
                ORDER BY m.ROWID ASC""",
-            (int(last_seen),),
+            (int(last_seen), *OWNER_HANDLES),
         ).fetchall()
 
         msgs = [dict(r) for r in rows]
-        if msgs:
-            db.set_state(STATE_KEY, str(msgs[-1]["rowid"]))
+        # Advance cursor to current DB max so non-owner messages aren't
+        # re-scanned on every poll.
+        current = _max_rowid(c)
+        if current > int(last_seen):
+            db.set_state(STATE_KEY, str(current))
         return msgs
     finally:
         c.close()
