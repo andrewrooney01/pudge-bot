@@ -28,7 +28,7 @@ LENS_PATH = CONFIG_DIR / "lens.md"
 
 WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 
-IMESSAGE_RECIPIENT = "andrewrooney01@gmail.com"
+IMESSAGE_RECIPIENT = "+19086751787"
 
 # Only messages from these iMessage handles are treated as questions for the orb.
 OWNER_HANDLES = ("+19086751787", "andrewrooney01@gmail.com")
