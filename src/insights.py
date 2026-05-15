@@ -1,7 +1,6 @@
 import json
 import re
 import subprocess
-from pathlib import Path
 
 import ontology
 from config import LENS_PATH
@@ -18,11 +17,14 @@ def _build_prompt(transcript: str, acoustic: dict) -> str:
         for r in history_rows
     ) or "(no prior reflections yet)"
 
+    wpm = acoustic.get("speaking_rate_wpm")
+    std = acoustic.get("pitch_std")
+    pause = acoustic.get("pause_ratio")
     acoustic_blurb = (
-        f"speaking_rate={acoustic.get('speaking_rate_wpm'):.0f} wpm, "
-        f"pitch_std={acoustic.get('pitch_std'):.1f}, "
-        f"pause_ratio={acoustic.get('pause_ratio'):.2f}"
-        if acoustic.get("speaking_rate_wpm") is not None
+        f"speaking_rate={wpm:.0f} wpm, "
+        f"pitch_std={std:.1f}, "
+        f"pause_ratio={pause:.2f}"
+        if wpm is not None and std is not None and pause is not None
         else "(acoustic features unavailable)"
     )
 
