@@ -47,7 +47,10 @@ q: what would it look like to fully commit, and what are you protecting by not?
 
 Personal use. Single user, Apple Silicon Mac. Not packaged for general distribution — but straightforward to clone and run if you follow the setup below.
 
-> **Privacy note:** Your phone number and email live in `src/config_local.py` (gitignored). The ontology files in `config/ontology/` ship as empty templates — once you start filling them in with personal content, keep the repo private or add those files to your local `.gitignore`.
+> **Privacy note:** Your phone number and email live in `src/config_local.py` (gitignored).
+
+> [!CAUTION]
+> The ontology files in `config/ontology/` ship as empty templates and are tracked by git. Once you start filling them in with personal content, **keep the repo private** or add those files to your local `.gitignore`.
 
 ---
 
