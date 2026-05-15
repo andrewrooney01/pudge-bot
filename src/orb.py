@@ -96,10 +96,12 @@ def process(audio_path: Path) -> None:
     db.save_transcript(rec_id, t["text"], t["language"])
     db.save_acoustic(rec_id, a)
     db.save_insights(rec_id, parsed, raw)
-    for prop in parsed.get("proposals", []):
-        db.save_proposal(rec_id, prop.get("file", ""), prop.get("section", ""), prop.get("proposal", ""))
-    if parsed.get("proposals"):
-        log.info("  %d ontology proposal(s) queued", len(parsed["proposals"]))
+    proposals = parsed.get("proposals") if isinstance(parsed.get("proposals"), list) else []
+    for prop in proposals:
+        if isinstance(prop, dict):
+            db.save_proposal(rec_id, prop.get("file", ""), prop.get("section", ""), prop.get("proposal", ""))
+    if proposals:
+        log.info("  %d ontology proposal(s) queued", len(proposals))
 
     log.info("✓ done: %s", audio_path.name)
 
