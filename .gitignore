@@ -11,3 +11,4 @@ __pycache__/
 venv/
 .DS_Store
 philosophy.md
+src/config_local.py
