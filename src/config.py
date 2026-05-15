@@ -29,10 +29,14 @@ ARTIFACTS_DIR = ONTOLOGY_DIR / "artifacts"
 
 WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 
-IMESSAGE_RECIPIENT = "+19086751787"
+# Personal values — override in src/config_local.py (gitignored)
+IMESSAGE_RECIPIENT = "+1XXXXXXXXXX"
+OWNER_HANDLES = ("+1XXXXXXXXXX",)
 
-# Only messages from these iMessage handles are treated as questions for the orb.
-OWNER_HANDLES = ("+19086751787", "andrewrooney01@gmail.com")
+try:
+    from config_local import *  # noqa: F401, F403
+except ImportError:
+    pass
 
 for d in (DATA_DIR, LOGS_DIR, CONFIG_DIR, ONTOLOGY_DIR, ARTIFACTS_DIR):
     d.mkdir(parents=True, exist_ok=True)

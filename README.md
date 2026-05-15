@@ -14,9 +14,9 @@ The orb watches for new voice notes, transcribes them, analyzes the acoustics, a
 ```
 orb · focused
 
-Talked through the decision to stay patient on the Hadrian opportunity.
-Noted tension between wanting to move fast and trusting the compounding
-logic. Energy was high, pace deliberate.
+Talked through a work decision — tension between moving fast and trusting
+the compounding logic. Leaning toward patience but second-guessing it.
+Energy was high, pace deliberate.
 
 themes: professional, emotional
 pattern: third time this week optionality vs. commitment has come up
@@ -47,6 +47,8 @@ q: what would it look like to fully commit, and what are you protecting by not?
 
 Personal use. Single user, Apple Silicon Mac. Not packaged for general distribution — but straightforward to clone and run if you follow the setup below.
 
+> **Privacy note:** Your phone number and email live in `src/config_local.py` (gitignored). The ontology files in `config/ontology/` ship as empty templates — once you start filling them in with personal content, keep the repo private or add those files to your local `.gitignore`.
+
 ---
 
 ## Tech stack
@@ -75,7 +77,7 @@ iPhone (Just Press Record) → iCloud → Mac
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/andrewrooney01/the-orb.git
+git clone https://github.com/YOUR_USERNAME/the-orb.git
 cd the-orb
 python3 -m venv .venv
 source .venv/bin/activate
@@ -84,12 +86,18 @@ pip install -r requirements.txt
 
 ### 2. Configure
 
-Edit `src/config.py` — two lines to update:
+```bash
+cp src/config_local.py.example src/config_local.py
+```
+
+Edit `src/config_local.py` with your values:
 
 ```python
-IMESSAGE_RECIPIENT = "+1XXXXXXXXXX"   # your phone number
-OWNER_HANDLES = ("+1XXXXXXXXXX", "you@icloud.com")  # same number + Apple ID email
+IMESSAGE_RECIPIENT = "+1XXXXXXXXXX"
+OWNER_HANDLES = ("+1XXXXXXXXXX", "you@icloud.com")
 ```
+
+`config_local.py` is gitignored — your phone number and email never touch the repo.
 
 ### 3. Fill in your ontology
 
@@ -97,11 +105,10 @@ Open the files in `config/ontology/` and fill in what you know today. Start with
 
 ### 4. Set up the launchd job
 
-The plist in `config/com.theorb.watcher.plist` has hardcoded paths — update them to match your setup:
+The plists in `config/` have a path placeholder — swap it for your home directory:
 
 ```bash
-# Replace every occurrence of /Users/andrewrooney with your home directory
-sed -i '' "s|/Users/andrewrooney|$HOME|g" config/com.theorb.watcher.plist
+sed -i '' "s|/Users/PLACEHOLDER|$HOME|g" config/com.theorb.watcher.plist config/com.theorb.autopull.plist
 ```
 
 Then load it:

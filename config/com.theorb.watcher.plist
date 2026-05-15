@@ -7,19 +7,19 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/andrewrooney/Projects/the-orb/.venv/bin/python</string>
-        <string>/Users/andrewrooney/Projects/the-orb/src/orb.py</string>
+        <string>/Users/PLACEHOLDER/Projects/the-orb/.venv/bin/python</string>
+        <string>/Users/PLACEHOLDER/Projects/the-orb/src/orb.py</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/andrewrooney/Projects/the-orb/src</string>
+    <string>/Users/PLACEHOLDER/Projects/the-orb/src</string>
 
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/Users/andrewrooney/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <string>/Users/PLACEHOLDER/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>HOME</key>
-        <string>/Users/andrewrooney</string>
+        <string>/Users/PLACEHOLDER</string>
     </dict>
 
     <key>StartInterval</key>
@@ -29,10 +29,10 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/Users/andrewrooney/Projects/the-orb/logs/launchd.out</string>
+    <string>/Users/PLACEHOLDER/Projects/the-orb/logs/launchd.out</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/andrewrooney/Projects/the-orb/logs/launchd.err</string>
+    <string>/Users/PLACEHOLDER/Projects/the-orb/logs/launchd.err</string>
 
 </dict>
 </plist>
