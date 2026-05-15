@@ -1,5 +1,9 @@
 # the orb
 
+<p align="center">
+  <img src="assets/orb.jpg" alt="the orb" width="600">
+</p>
+
 Speak your thoughts on a walk. Get back a mirror.
 
 The orb watches for new voice notes, transcribes them, analyzes the acoustics, and sends you an iMessage with mood, patterns, and a question — automatically, within a minute of recording. Reply in the same thread to query your history. Over time it cross-references your reflections against a personal ontology you build: your values, goals across every time horizon, worldview, and principles.
