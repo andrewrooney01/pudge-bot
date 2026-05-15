@@ -3,17 +3,14 @@ import re
 import subprocess
 from pathlib import Path
 
-from config import LENS_PATH, PHILOSOPHY_PATH
+import ontology
+from config import LENS_PATH
 from db import recent_insights
 
 
 def _build_prompt(transcript: str, acoustic: dict) -> str:
     lens = LENS_PATH.read_text() if LENS_PATH.exists() else ""
-    philosophy = (
-        PHILOSOPHY_PATH.read_text()
-        if PHILOSOPHY_PATH.exists()
-        else "(empty — accumulating from reflections)"
-    )
+    onto = ontology.load()
 
     history_rows = recent_insights(limit=7)
     history = "\n".join(
@@ -29,12 +26,14 @@ def _build_prompt(transcript: str, acoustic: dict) -> str:
         else "(acoustic features unavailable)"
     )
 
+    onto_section = onto if onto else "(not yet populated)"
+
     return f"""{lens}
 
 ---
 
-## Andrew's evolving philosophy
-{philosophy}
+## User ontology (canonical self-model)
+{onto_section}
 
 ---
 

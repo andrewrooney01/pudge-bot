@@ -79,6 +79,9 @@ def process(audio_path: Path) -> None:
     log.info("  generating insights...")
     parsed, raw = insights.generate(t["text"], a)
     log.info("  insight: [%s] %s", parsed.get("mood"), parsed.get("summary", "")[:80])
+    if parsed.get("inconsistencies"):
+        for tension in parsed["inconsistencies"]:
+            log.info("  ⚡ inconsistency: %s", tension)
 
     log.info("  sending iMessage...")
     msg = notify.format_message(parsed, a)
@@ -93,6 +96,10 @@ def process(audio_path: Path) -> None:
     db.save_transcript(rec_id, t["text"], t["language"])
     db.save_acoustic(rec_id, a)
     db.save_insights(rec_id, parsed, raw)
+    for prop in parsed.get("proposals", []):
+        db.save_proposal(rec_id, prop.get("file", ""), prop.get("section", ""), prop.get("proposal", ""))
+    if parsed.get("proposals"):
+        log.info("  %d ontology proposal(s) queued", len(parsed["proposals"]))
 
     log.info("✓ done: %s", audio_path.name)
 

@@ -1,22 +1,21 @@
 import json
 import subprocess
 
-from config import LENS_PATH, PHILOSOPHY_PATH
+import ontology
+from config import LENS_PATH
 from db import reflections_snapshot
 
 
 def _build_prompt(question: str) -> str:
     lens = LENS_PATH.read_text() if LENS_PATH.exists() else ""
-    philosophy = (
-        PHILOSOPHY_PATH.read_text()
-        if PHILOSOPHY_PATH.exists()
-        else "(empty)"
-    )
+    onto = ontology.load()
     snapshot = reflections_snapshot(limit=20)
 
+    onto_section = onto if onto else "(not yet populated)"
+
     return f"""You are the orb, answering an ad-hoc question from the user over iMessage.
-The orb's lens (analytical framework) and a snapshot of recent reflections
-are below. Use them to answer truthfully and concisely.
+The orb's lens, the user's ontology (canonical self-model), and a snapshot of recent
+reflections are below. Use them to answer truthfully and concisely.
 
 ## Lens
 
@@ -24,9 +23,8 @@ are below. Use them to answer truthfully and concisely.
 
 ---
 
-## Andrew's evolving philosophy
-
-{philosophy}
+## User ontology
+{onto_section}
 
 ---
 
