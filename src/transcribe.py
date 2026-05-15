@@ -1,4 +1,6 @@
 import errno
+import os
+import select
 import shutil
 import subprocess
 import tempfile
@@ -10,8 +12,30 @@ import mlx_whisper
 from config import WHISPER_MODEL
 
 _ICLOUD_DIR = Path.home() / "Library" / "Mobile Documents"
-_SYNC_RETRIES = 8
-_SYNC_RETRY_DELAY = 5.0  # seconds; bird usually releases within 10-30s
+_SYNC_TIMEOUT = 300.0  # max seconds to wait for iCloud to release the lock
+
+
+def _wait_for_icloud_update(path: Path, timeout: float) -> None:
+    # Open the file O_NONBLOCK so we don't block on the iCloud lock at open().
+    # Then register a kqueue vnode watch — bird will trigger NOTE_WRITE or
+    # NOTE_ATTRIB when it finishes syncing, waking us immediately.
+    try:
+        fd = os.open(str(path), os.O_RDONLY | os.O_NONBLOCK)
+    except OSError:
+        time.sleep(min(timeout, 5))
+        return
+    try:
+        kq = select.kqueue()
+        ev = select.kevent(
+            fd,
+            filter=select.KQ_FILTER_VNODE,
+            flags=select.KQ_EV_ADD | select.KQ_EV_ENABLE | select.KQ_EV_ONESHOT,
+            fflags=select.KQ_NOTE_WRITE | select.KQ_NOTE_ATTRIB | select.KQ_NOTE_EXTEND,
+        )
+        kq.control([ev], 1, timeout)
+        kq.close()
+    finally:
+        os.close(fd)
 
 
 def _icloud_safe_copy(src: Path, dst: Path) -> None:
@@ -21,21 +45,19 @@ def _icloud_safe_copy(src: Path, dst: Path) -> None:
     # the child inherits FDA but runs in a fresh process context that bird
     # doesn't hold a conflicting lock against.
     #
-    # Falls back to a Python read/write loop with retries if cp itself fails.
-    for attempt in range(_SYNC_RETRIES):
-        try:
-            result = subprocess.run(
-                ["/bin/cp", str(src), str(dst)],
-                capture_output=True,
-            )
-            if result.returncode == 0:
-                return
-            # cp failed — fall through to the Python fallback below
-            stderr = result.stderr.decode(errors="replace").strip()
-            if "Resource deadlock" not in stderr:
-                raise OSError(f"cp failed: {stderr}")
-        except Exception:
-            pass
+    # brctl download kicks iCloud to prioritize syncing this file. Then instead
+    # of sleeping fixed intervals, we use kqueue to block until bird actually
+    # writes or updates the file, so we retry the instant the lock releases.
+    subprocess.run(["brctl", "download", str(src)], capture_output=True, timeout=10)
+
+    deadline = time.monotonic() + _SYNC_TIMEOUT
+    while True:
+        result = subprocess.run(["/bin/cp", str(src), str(dst)], capture_output=True)
+        if result.returncode == 0:
+            return
+        stderr = result.stderr.decode(errors="replace").strip()
+        if "Resource deadlock" not in stderr:
+            raise OSError(f"cp failed: {stderr}")
 
         try:
             with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
@@ -44,13 +66,14 @@ def _icloud_safe_copy(src: Path, dst: Path) -> None:
         except OSError as e:
             if e.errno != errno.EDEADLK:
                 raise
-            if attempt == _SYNC_RETRIES - 1:
-                raise PermissionError(
-                    f"iCloud sync lock on {src} did not release after "
-                    f"{_SYNC_RETRIES} retries. Check Full Disk Access for "
-                    "the Python binary in System Settings → Privacy & Security."
-                ) from e
-            time.sleep(_SYNC_RETRY_DELAY)
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise PermissionError(
+                f"iCloud sync lock on {src} did not release after "
+                f"{_SYNC_TIMEOUT:.0f}s."
+            )
+        _wait_for_icloud_update(src, timeout=min(remaining, 30))
 
 
 def _is_icloud_path(path: Path) -> bool:
