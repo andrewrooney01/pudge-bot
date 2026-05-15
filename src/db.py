@@ -2,6 +2,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from config import DB_PATH
 
@@ -77,6 +78,15 @@ def conn():
 def init():
     with conn() as c:
         c.executescript(SCHEMA)
+        # Columns added after initial schema — safe to run repeatedly
+        for ddl in [
+            "ALTER TABLE philosophy_proposals ADD COLUMN file TEXT",
+            "ALTER TABLE philosophy_proposals ADD COLUMN recording_id INTEGER",
+        ]:
+            try:
+                c.execute(ddl)
+            except sqlite3.OperationalError:
+                pass
 
 
 def already_processed(audio_path: Path) -> bool:
@@ -175,6 +185,29 @@ def save_query(question: str, answer: str, raw: str, sender: str | None = None) 
             "VALUES (?, ?, ?, ?)",
             (sender, question, answer, raw),
         )
+
+
+def save_proposal(recording_id: int, file: str, section: str, proposal: str) -> None:
+    with conn() as c:
+        c.execute(
+            "INSERT INTO philosophy_proposals (file, section, proposal, recording_id) "
+            "VALUES (?, ?, ?, ?)",
+            (file, section, proposal, recording_id),
+        )
+
+
+def pending_proposals(limit: int = 20) -> list[dict]:
+    with conn() as c:
+        rows = c.execute(
+            """SELECT p.id, p.proposed_at, p.file, p.section, p.proposal,
+                      r.recorded_at AS source_recorded_at
+               FROM philosophy_proposals p
+               LEFT JOIN recordings r ON r.id = p.recording_id
+               WHERE p.status = 'pending'
+               ORDER BY p.proposed_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def reflections_snapshot(limit: int = 20) -> list[dict]:
