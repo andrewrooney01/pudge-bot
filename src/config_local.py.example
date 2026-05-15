@@ -1,0 +1,5 @@
+# Copy this file to config_local.py and fill in your values.
+# config_local.py is gitignored — your personal details stay local.
+
+IMESSAGE_RECIPIENT = "+1XXXXXXXXXX"       # your iPhone number
+OWNER_HANDLES = ("+1XXXXXXXXXX", "you@icloud.com")  # same number + Apple ID email
