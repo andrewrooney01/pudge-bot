@@ -4,7 +4,38 @@ import subprocess
 
 import ontology
 from config import LENS_PATH
-from db import recent_insights
+from db import recent_insights, recent_health, recent_workouts
+
+
+def _health_blurb(health_rows: list[dict], workout_rows: list[dict]) -> str:
+    if not health_rows and not workout_rows:
+        return "(no health data)"
+    parts = []
+    for r in health_rows[:3]:
+        steps = r.get("steps")
+        cal = r.get("active_energy_kcal")
+        ex = r.get("exercise_minutes")
+        hrv = r.get("hrv_ms")
+        hr_rest = r.get("resting_heart_rate")
+        line = f"  {r['date']}: steps={steps}"
+        if cal:
+            line += f"  active_cal={cal:.0f}"
+        if ex:
+            line += f"  exercise={ex}min"
+        if hrv:
+            line += f"  hrv={hrv:.0f}ms"
+        if hr_rest:
+            line += f"  rhr={hr_rest:.0f}bpm"
+        parts.append(line)
+    if workout_rows:
+        parts.append("  Recent workouts:")
+        for w in workout_rows[:5]:
+            dist = f"  {w['distance_km']:.1f}km" if w.get("distance_km") else ""
+            parts.append(
+                f"    {w['start_time'][:10]} {w['workout_type']} "
+                f"{w['duration_min']:.0f}min{dist}"
+            )
+    return "\n".join(parts) if parts else "(no health data)"
 
 
 def _build_prompt(transcript: str, acoustic: dict) -> str:
@@ -29,6 +60,7 @@ def _build_prompt(transcript: str, acoustic: dict) -> str:
     )
 
     onto_section = onto if onto else "(not yet populated)"
+    health_section = _health_blurb(recent_health(days=7), recent_workouts(days=7))
 
     return f"""{lens}
 
@@ -41,6 +73,11 @@ def _build_prompt(transcript: str, acoustic: dict) -> str:
 
 ## Recent reflections (most recent first)
 {history}
+
+---
+
+## Recent health & movement (last 3 days)
+{health_section}
 
 ---
 
