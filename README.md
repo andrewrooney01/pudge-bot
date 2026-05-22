@@ -4,9 +4,38 @@
   <img src="assets/orb.jpg" alt="the orb" width="600">
 </p>
 
-A private oracle for your inner monologue. Think out loud. The orb thinks back.
+<p align="center">
+  <em>A private oracle for your inner monologue. Think out loud. The orb thinks back.</em>
+</p>
 
-The orb watches for new voice notes, transcribes them, analyzes the acoustics, and sends you an iMessage with mood, patterns, and a question — automatically, within a minute of recording. Reply in the same thread to query your history. Over time it cross-references your reflections against a personal ontology you build: your values, goals across every time horizon, worldview, and principles.
+<p align="center">
+  <a href="#use-cases">Use cases</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#what-this-demonstrates">What this demonstrates</a> ·
+  <a href="#setup">Setup</a>
+</p>
+
+---
+
+The orb watches for new voice notes, transcribes them on-device, analyzes the acoustics, and texts you back within a minute — with mood, patterns, and one open question worth sitting with. Reply in the same thread to query your full reflection history. Over time it cross-references every voice note against a personal ontology you build (values, goals across every horizon, worldview, principles) and flags inconsistencies between who you say you are and what you actually said today.
+
+It is a self-coaching system, a memory augment, and a small piece of personal infrastructure that runs quietly on your own machine.
+
+---
+
+## Use cases
+
+**Daily reflection without writing.** Voice is faster and more honest than typing. Speak for two minutes on your walk to work; get back a structured read of what you actually said — mood, themes, a question — before you sit down at your desk.
+
+**Pattern detection across weeks.** "Third time this week optionality vs. commitment has come up." The orb surfaces the loops you'd otherwise miss. Speaking rate, pause ratio, and pitch variance get tracked as quietly-rich signals about how you're actually doing — not just what you said.
+
+**Pre-therapy prep.** Before a session, ask the thread *"what have I been circling on the last two weeks?"* and walk in with the actual themes, not a vague sense. The orb's history database becomes a structured input to deeper work.
+
+**Decision support grounded in your own history.** *"Have I mentioned wanting to leave my job?"* *"What did I say last time I was considering a big move?"* — every answer comes from your own past reflections, not generic advice.
+
+**Values-vs-behavior audit.** You write down what you value. The orb watches what you actually talk about. When the two diverge, it flags it and proposes an ontology update — forcing you to either change behavior or update the story you tell yourself.
+
+**Long-horizon coherence.** Your goals file holds today, this week, this month, this year, 3-year, 10-year, 20-year, and 50-year horizons. Each daily reflection gets evaluated against all of them. Drift becomes visible.
 
 ---
 
@@ -44,6 +73,18 @@ q: what would it look like to fully commit, and what are you protecting by not?
 - **Inconsistency detection** — flags when a reflection contradicts your stated values or goals; queues proposed ontology edits for your review
 - **Ad-hoc queries** — reply to the iMessage thread, get answers grounded in your history
 - **Fully private** — runs on your Mac, data stays local, only the text prompt reaches the Claude API
+
+---
+
+## What this demonstrates
+
+For anyone reading this as a portfolio piece — what's actually interesting under the hood:
+
+- **End-to-end personal data pipeline.** iCloud file watcher → local Whisper inference (MLX, Apple Silicon) → DSP feature extraction (librosa) → LLM reasoning with structured JSON output → SQLite persistence → iMessage delivery via AppleScript. Six different runtime substrates wired together so the user just speaks and gets a text back.
+- **System design under real constraints.** Runs as a launchd job with kqueue file-event watching (not polling), handles iCloud's lazy file download semantics, survives sleep/wake cycles, respects subprocess argument-size limits, and isolates large reference artifacts from the per-reflection prompt so daily inference stays fast.
+- **Stateful AI architecture.** Every reflection is evaluated against a versioned personal ontology, a rolling history window, and an "inconsistency" criterion. The system proposes structured ontology edits which the user reviews before accepting — a human-in-the-loop loop, not autonomous drift.
+- **Privacy-first by construction.** Audio never leaves the Mac. Transcription is local. Personal data lives in gitignored files. Only the synthesized text prompt reaches the LLM API. A non-technical user couldn't accidentally leak.
+- **Product-engineering taste.** The user-facing surface is a text message. Everything else is invisible infrastructure. Two minutes of voice → 20 seconds of structured reflection in your pocket, no app to open, no UI to manage.
 
 ---
 
@@ -164,3 +205,11 @@ config/ontology/
 data/         SQLite database (gitignored)
 logs/         runtime logs (gitignored)
 ```
+
+---
+
+## License
+
+This repository is published for portfolio viewing only. All rights reserved. See [LICENSE](LICENSE).
+
+For licensing inquiries: you@icloud.com
