@@ -9,7 +9,7 @@ from db import recent_insights
 
 def _build_prompt(transcript: str, acoustic: dict) -> str:
     lens = LENS_PATH.read_text() if LENS_PATH.exists() else ""
-    onto = ontology.load()
+    onto = ontology.load(include_books=False)
 
     history_rows = recent_insights(limit=7)
     history = "\n".join(
@@ -69,8 +69,7 @@ def _extract_json(text: str) -> dict:
 def generate(transcript: str, acoustic: dict) -> tuple[dict, str]:
     prompt = _build_prompt(transcript, acoustic)
     result = subprocess.run(
-        ["claude", "-p"],
-        input=prompt,
+        ["claude", "-p", prompt],
         capture_output=True,
         text=True,
         timeout=180,
