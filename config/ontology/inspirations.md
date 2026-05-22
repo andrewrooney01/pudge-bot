@@ -3,7 +3,7 @@
 ## Thinkers & Works That Have Shaped My Thinking
 
 - **David Deutsch — The Beginning of Infinity**: Problems are soluble. Knowledge grows without limit. The right response to a hard problem is a better explanation, not resignation.
-- **Sheena Hankins — Complete Confidence**: Self-trust is a skill, not a trait. Confidence is built through evidence, not performed. The inner critic is a habit, not a truth-teller.
+- **Sheenah Hankin — Complete Confidence**: Self-trust is a skill, not a trait. Confidence is built through evidence, not performed. The inner critic is a habit, not a truth-teller. 
 - **Naval Ravikant**: Specific knowledge, accountability, leverage. Play long-term games with long-term people. Wealth is created, not captured.
 - **Matt Ridley — The Rational Optimist**: Exchange and specialization are the engines of progress. Emergent complexity beats top-down design. Pessimism is usually just myopia.
 - **Siddhartha by Hermann Hesse**: The river knows. Seeking and dwelling are both part of becoming. You cannot be taught — only awakened.

@@ -13,3 +13,23 @@
 
 ## Things I've Learned the Hard Way
 
+
+<!-- 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
