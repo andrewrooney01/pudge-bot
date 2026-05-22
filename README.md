@@ -30,8 +30,6 @@ It is a self-coaching system, a memory augment, and a small piece of personal in
 
 **Pattern detection across weeks.** "Third time this week optionality vs. commitment has come up." The orb surfaces the loops you'd otherwise miss. Speaking rate, pause ratio, and pitch variance get tracked as quietly-rich signals about how you're actually doing — not just what you said.
 
-**Pre-therapy prep.** Before a session, ask the thread *"what have I been circling on the last two weeks?"* and walk in with the actual themes, not a vague sense. The orb's history database becomes a structured input to deeper work.
-
 **Decision support grounded in your own history.** *"Have I mentioned wanting to leave my job?"* *"What did I say last time I was considering a big move?"* — every answer comes from your own past reflections, not generic advice.
 
 **Values-vs-behavior audit.** You write down what you value. The orb watches what you actually talk about. When the two diverge, it flags it and proposes an ontology update — forcing you to either change behavior or update the story you tell yourself.
