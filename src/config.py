@@ -29,6 +29,16 @@ ARTIFACTS_DIR = ONTOLOGY_DIR / "artifacts"
 
 WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 
+# Eight Sleep — override in src/config_local.py (gitignored)
+EIGHT_SLEEP_EMAIL = ""
+EIGHT_SLEEP_PASSWORD = ""
+EIGHT_SLEEP_TIMEZONE = "America/New_York"
+
+# Apple Health export directory — iOS Shortcut writes YYYY-MM-DD.json files here.
+# See config/health_shortcut.md for setup. Override in config_local.py if needed.
+HEALTH_EXPORT_DIR = HOME / "Library" / "Mobile Documents" / \
+    "com~apple~CloudDocs" / "Health"
+
 # Personal values — override in src/config_local.py (gitignored)
 IMESSAGE_RECIPIENT = "+1XXXXXXXXXX"
 OWNER_HANDLES = ("+1XXXXXXXXXX",)

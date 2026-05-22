@@ -60,6 +60,58 @@ CREATE TABLE IF NOT EXISTS queries (
     answer TEXT,
     raw_response TEXT
 );
+
+CREATE TABLE IF NOT EXISTS sleep_sessions (
+    id INTEGER PRIMARY KEY,
+    session_date TEXT NOT NULL,
+    bed_side TEXT,
+    session_start TEXT,
+    sleep_score INTEGER,
+    fitness_score INTEGER,
+    heart_rate_avg REAL,
+    resp_rate_avg REAL,
+    toss_turns INTEGER,
+    bed_temp_avg REAL,
+    room_temp_avg REAL,
+    duration_light_sec INTEGER,
+    duration_deep_sec INTEGER,
+    duration_rem_sec INTEGER,
+    duration_awake_sec INTEGER,
+    duration_score INTEGER,
+    wakeup_consistency_score INTEGER,
+    raw_json TEXT,
+    fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(session_date, bed_side)
+);
+
+CREATE TABLE IF NOT EXISTS health_daily (
+    id INTEGER PRIMARY KEY,
+    date TEXT NOT NULL UNIQUE,
+    steps INTEGER,
+    active_energy_kcal REAL,
+    exercise_minutes INTEGER,
+    stand_hours INTEGER,
+    resting_heart_rate REAL,
+    hrv_ms REAL,
+    respiratory_rate REAL,
+    source TEXT DEFAULT 'health_export',
+    fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS workout_sessions (
+    id INTEGER PRIMARY KEY,
+    workout_type TEXT,
+    start_time TEXT NOT NULL,
+    end_time TEXT,
+    duration_min REAL,
+    distance_km REAL,
+    active_energy_kcal REAL,
+    location_start_lat REAL,
+    location_start_lon REAL,
+    raw_json TEXT,
+    fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(start_time, workout_type)
+);
 """
 
 
@@ -193,6 +245,153 @@ def save_proposal(recording_id: int, file: str, section: str, proposal: str) -> 
             "VALUES (?, ?, ?, ?)",
             (file, section, proposal, recording_id),
         )
+
+
+def upsert_sleep_session(session: dict) -> None:
+    with conn() as c:
+        c.execute(
+            """INSERT INTO sleep_sessions
+               (session_date, bed_side, session_start, sleep_score, fitness_score,
+                heart_rate_avg, resp_rate_avg, toss_turns, bed_temp_avg, room_temp_avg,
+                duration_light_sec, duration_deep_sec, duration_rem_sec, duration_awake_sec,
+                duration_score, wakeup_consistency_score, raw_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(session_date, bed_side) DO UPDATE SET
+                 sleep_score=excluded.sleep_score,
+                 fitness_score=excluded.fitness_score,
+                 heart_rate_avg=excluded.heart_rate_avg,
+                 resp_rate_avg=excluded.resp_rate_avg,
+                 toss_turns=excluded.toss_turns,
+                 bed_temp_avg=excluded.bed_temp_avg,
+                 room_temp_avg=excluded.room_temp_avg,
+                 duration_light_sec=excluded.duration_light_sec,
+                 duration_deep_sec=excluded.duration_deep_sec,
+                 duration_rem_sec=excluded.duration_rem_sec,
+                 duration_awake_sec=excluded.duration_awake_sec,
+                 duration_score=excluded.duration_score,
+                 wakeup_consistency_score=excluded.wakeup_consistency_score,
+                 raw_json=excluded.raw_json,
+                 fetched_at=datetime('now')""",
+            (
+                session.get("session_date"),
+                session.get("bed_side"),
+                session.get("session_start"),
+                session.get("sleep_score"),
+                session.get("fitness_score"),
+                session.get("heart_rate_avg"),
+                session.get("resp_rate_avg"),
+                session.get("toss_turns"),
+                session.get("bed_temp_avg"),
+                session.get("room_temp_avg"),
+                session.get("duration_light_sec"),
+                session.get("duration_deep_sec"),
+                session.get("duration_rem_sec"),
+                session.get("duration_awake_sec"),
+                session.get("duration_score"),
+                session.get("wakeup_consistency_score"),
+                session.get("raw_json"),
+            ),
+        )
+
+
+def upsert_health_daily(record: dict) -> None:
+    with conn() as c:
+        c.execute(
+            """INSERT INTO health_daily
+               (date, steps, active_energy_kcal, exercise_minutes, stand_hours,
+                resting_heart_rate, hrv_ms, respiratory_rate, source)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(date) DO UPDATE SET
+                 steps=excluded.steps,
+                 active_energy_kcal=excluded.active_energy_kcal,
+                 exercise_minutes=excluded.exercise_minutes,
+                 stand_hours=excluded.stand_hours,
+                 resting_heart_rate=excluded.resting_heart_rate,
+                 hrv_ms=excluded.hrv_ms,
+                 respiratory_rate=excluded.respiratory_rate,
+                 source=excluded.source,
+                 fetched_at=datetime('now')""",
+            (
+                record.get("date"),
+                record.get("steps"),
+                record.get("active_energy_kcal"),
+                record.get("exercise_minutes"),
+                record.get("stand_hours"),
+                record.get("resting_heart_rate"),
+                record.get("hrv_ms"),
+                record.get("respiratory_rate"),
+                record.get("source", "health_export"),
+            ),
+        )
+
+
+def upsert_workout(workout: dict) -> None:
+    with conn() as c:
+        c.execute(
+            """INSERT INTO workout_sessions
+               (workout_type, start_time, end_time, duration_min, distance_km,
+                active_energy_kcal, location_start_lat, location_start_lon, raw_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(start_time, workout_type) DO UPDATE SET
+                 end_time=excluded.end_time,
+                 duration_min=excluded.duration_min,
+                 distance_km=excluded.distance_km,
+                 active_energy_kcal=excluded.active_energy_kcal,
+                 location_start_lat=excluded.location_start_lat,
+                 location_start_lon=excluded.location_start_lon,
+                 raw_json=excluded.raw_json,
+                 fetched_at=datetime('now')""",
+            (
+                workout.get("workout_type"),
+                workout.get("start_time"),
+                workout.get("end_time"),
+                workout.get("duration_min"),
+                workout.get("distance_km"),
+                workout.get("active_energy_kcal"),
+                workout.get("location_start_lat"),
+                workout.get("location_start_lon"),
+                workout.get("raw_json"),
+            ),
+        )
+
+
+def recent_sleep(days: int = 7) -> list[dict]:
+    with conn() as c:
+        rows = c.execute(
+            """SELECT session_date, sleep_score, fitness_score, heart_rate_avg,
+                      resp_rate_avg, toss_turns, bed_temp_avg, room_temp_avg,
+                      duration_light_sec, duration_deep_sec, duration_rem_sec,
+                      duration_awake_sec
+               FROM sleep_sessions
+               ORDER BY session_date DESC LIMIT ?""",
+            (days,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def recent_health(days: int = 7) -> list[dict]:
+    with conn() as c:
+        rows = c.execute(
+            """SELECT date, steps, active_energy_kcal, exercise_minutes,
+                      stand_hours, resting_heart_rate, hrv_ms, respiratory_rate
+               FROM health_daily
+               ORDER BY date DESC LIMIT ?""",
+            (days,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def recent_workouts(days: int = 7) -> list[dict]:
+    with conn() as c:
+        rows = c.execute(
+            """SELECT workout_type, start_time, duration_min, distance_km,
+                      active_energy_kcal
+               FROM workout_sessions
+               WHERE date(start_time) >= date('now', ?)
+               ORDER BY start_time DESC""",
+            (f"-{days} days",),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def pending_proposals(limit: int = 20) -> list[dict]:
