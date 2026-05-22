@@ -60,6 +60,29 @@ CREATE TABLE IF NOT EXISTS queries (
     answer TEXT,
     raw_response TEXT
 );
+
+CREATE TABLE IF NOT EXISTS sleep_sessions (
+    id INTEGER PRIMARY KEY,
+    session_date TEXT NOT NULL,
+    bed_side TEXT,
+    session_start TEXT,
+    sleep_score INTEGER,
+    fitness_score INTEGER,
+    heart_rate_avg REAL,
+    resp_rate_avg REAL,
+    toss_turns INTEGER,
+    bed_temp_avg REAL,
+    room_temp_avg REAL,
+    duration_light_sec INTEGER,
+    duration_deep_sec INTEGER,
+    duration_rem_sec INTEGER,
+    duration_awake_sec INTEGER,
+    duration_score INTEGER,
+    wakeup_consistency_score INTEGER,
+    raw_json TEXT,
+    fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(session_date, bed_side)
+);
 """
 
 
@@ -193,6 +216,67 @@ def save_proposal(recording_id: int, file: str, section: str, proposal: str) -> 
             "VALUES (?, ?, ?, ?)",
             (file, section, proposal, recording_id),
         )
+
+
+def upsert_sleep_session(session: dict) -> None:
+    with conn() as c:
+        c.execute(
+            """INSERT INTO sleep_sessions
+               (session_date, bed_side, session_start, sleep_score, fitness_score,
+                heart_rate_avg, resp_rate_avg, toss_turns, bed_temp_avg, room_temp_avg,
+                duration_light_sec, duration_deep_sec, duration_rem_sec, duration_awake_sec,
+                duration_score, wakeup_consistency_score, raw_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(session_date, bed_side) DO UPDATE SET
+                 sleep_score=excluded.sleep_score,
+                 fitness_score=excluded.fitness_score,
+                 heart_rate_avg=excluded.heart_rate_avg,
+                 resp_rate_avg=excluded.resp_rate_avg,
+                 toss_turns=excluded.toss_turns,
+                 bed_temp_avg=excluded.bed_temp_avg,
+                 room_temp_avg=excluded.room_temp_avg,
+                 duration_light_sec=excluded.duration_light_sec,
+                 duration_deep_sec=excluded.duration_deep_sec,
+                 duration_rem_sec=excluded.duration_rem_sec,
+                 duration_awake_sec=excluded.duration_awake_sec,
+                 duration_score=excluded.duration_score,
+                 wakeup_consistency_score=excluded.wakeup_consistency_score,
+                 raw_json=excluded.raw_json,
+                 fetched_at=datetime('now')""",
+            (
+                session.get("session_date"),
+                session.get("bed_side"),
+                session.get("session_start"),
+                session.get("sleep_score"),
+                session.get("fitness_score"),
+                session.get("heart_rate_avg"),
+                session.get("resp_rate_avg"),
+                session.get("toss_turns"),
+                session.get("bed_temp_avg"),
+                session.get("room_temp_avg"),
+                session.get("duration_light_sec"),
+                session.get("duration_deep_sec"),
+                session.get("duration_rem_sec"),
+                session.get("duration_awake_sec"),
+                session.get("duration_score"),
+                session.get("wakeup_consistency_score"),
+                session.get("raw_json"),
+            ),
+        )
+
+
+def recent_sleep(days: int = 7) -> list[dict]:
+    with conn() as c:
+        rows = c.execute(
+            """SELECT session_date, sleep_score, fitness_score, heart_rate_avg,
+                      resp_rate_avg, toss_turns, bed_temp_avg, room_temp_avg,
+                      duration_light_sec, duration_deep_sec, duration_rem_sec,
+                      duration_awake_sec
+               FROM sleep_sessions
+               ORDER BY session_date DESC LIMIT ?""",
+            (days,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def pending_proposals(limit: int = 20) -> list[dict]:
