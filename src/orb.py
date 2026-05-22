@@ -108,11 +108,12 @@ def process(audio_path: Path) -> None:
 
 def answer_question(msg: dict) -> None:
     text = msg["text"]
-    log.info("Answering: %s", text[:80])
+    bot = msg.get("bot", "pudge")
+    log.info("Answering (bot=%s): %s", bot, text[:80])
     reply, raw = query.answer(text)
-    notify.send(reply)
+    notify.send(reply, bot=bot)
     db.save_query(text, reply, raw, sender=msg.get("sender"))
-    log.info("✓ answered (rowid=%s)", msg.get("rowid"))
+    log.info("✓ answered (update_id=%s)", msg.get("update_id"))
 
 
 def main() -> int:
@@ -131,7 +132,7 @@ def main() -> int:
     else:
         log.debug("no new recordings")
 
-    questions = inbox.poll()
+    questions = inbox.poll_all()
     if questions:
         log.info("found %d new message(s)", len(questions))
         for msg in questions:
@@ -140,8 +141,8 @@ def main() -> int:
             except Exception:
                 failures += 1
                 log.error(
-                    "failed answering rowid=%s\n%s",
-                    msg.get("rowid"),
+                    "failed answering update_id=%s\n%s",
+                    msg.get("update_id"),
                     traceback.format_exc(),
                 )
 

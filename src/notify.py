@@ -1,16 +1,23 @@
-import subprocess
+"""Outgoing messages — sends to a Telegram bot.
 
-from config import IMESSAGE_RECIPIENT, IMESSAGE_SENDER
+Replaces the previous AppleScript / iMessage delivery path. Each call
+identifies the target bot by name (default "pudge") and dispatches via
+the Telegram Bot API.
+"""
+import logging
 
+import bots
+from telegram_client import TelegramClient
 
-def _escape_applescript(s: str) -> str:
-    s = s.replace("\\", "\\\\").replace('"', '\\"')
-    # AppleScript string literals cannot contain literal newlines
-    s = s.replace("\n", '" & return & "')
-    return s
+log = logging.getLogger("orb.notify")
 
 
 def format_message(parsed: dict, acoustic: dict) -> str:
+    """Render an insight dict + acoustic features as a chat message.
+
+    Plain text; Telegram displays unicode and emoji natively. No markdown
+    escaping pain.
+    """
     rate = acoustic.get("speaking_rate_wpm")
     pause = acoustic.get("pause_ratio")
     rate_str = f"{rate:.0f} wpm" if rate is not None else "—"
@@ -26,23 +33,9 @@ def format_message(parsed: dict, acoustic: dict) -> str:
     )
 
 
-def send(message: str, recipient: str = IMESSAGE_RECIPIENT) -> None:
-    safe = _escape_applescript(message)
-    # If IMESSAGE_SENDER is set, send from that specific Apple ID handle so the
-    # recipient always sees the same sender identity. Otherwise fall back to
-    # whichever iMessage service Messages happens to list first.
-    if IMESSAGE_SENDER:
-        service_clause = (
-            f'set targetService to 1st service '
-            f'whose service type = iMessage and description = "{IMESSAGE_SENDER}"'
-        )
-    else:
-        service_clause = 'set targetService to 1st service whose service type = iMessage'
-    script = (
-        f'tell application "Messages"\n'
-        f'  {service_clause}\n'
-        f'  set targetBuddy to buddy "{recipient}" of targetService\n'
-        f'  send "{safe}" to targetBuddy\n'
-        f"end tell"
-    )
-    subprocess.run(["osascript", "-e", script], check=True)
+def send(message: str, bot: str = "pudge") -> None:
+    """Send `message` to the named bot's chat."""
+    b = bots.get(bot)
+    client = TelegramClient(b.token)
+    client.send_message(b.chat_id, message)
+    log.debug("sent to bot=%s chat_id=%s len=%d", b.name, b.chat_id, len(message))
