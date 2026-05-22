@@ -29,6 +29,11 @@ ARTIFACTS_DIR = ONTOLOGY_DIR / "artifacts"
 
 WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 
+# Eight Sleep — override in src/config_local.py (gitignored)
+EIGHT_SLEEP_EMAIL = ""
+EIGHT_SLEEP_PASSWORD = ""
+EIGHT_SLEEP_TIMEZONE = "America/New_York"
+
 # Personal values — override in src/config_local.py (gitignored)
 IMESSAGE_RECIPIENT = "+1XXXXXXXXXX"
 OWNER_HANDLES = ("+1XXXXXXXXXX",)

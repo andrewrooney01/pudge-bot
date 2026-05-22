@@ -4,7 +4,38 @@ import subprocess
 
 import ontology
 from config import LENS_PATH
-from db import recent_insights
+from db import recent_insights, recent_sleep
+
+
+def _fmt_duration(seconds: int | None) -> str:
+    if seconds is None:
+        return "?"
+    h, m = divmod(seconds // 60, 60)
+    return f"{h}h{m:02d}m"
+
+
+def _sleep_blurb(rows: list[dict]) -> str:
+    if not rows:
+        return "(no sleep data)"
+    lines = []
+    for r in rows[:3]:
+        bd = _fmt_duration(
+            (r.get("duration_light_sec") or 0)
+            + (r.get("duration_deep_sec") or 0)
+            + (r.get("duration_rem_sec") or 0)
+        )
+        deep = _fmt_duration(r.get("duration_deep_sec"))
+        rem = _fmt_duration(r.get("duration_rem_sec"))
+        score = r.get("sleep_score")
+        hr = r.get("heart_rate_avg")
+        line = (
+            f"  {r['session_date']}: score={score}  sleep={bd}  "
+            f"deep={deep}  rem={rem}"
+        )
+        if hr:
+            line += f"  hr={hr:.0f}bpm"
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def _build_prompt(transcript: str, acoustic: dict) -> str:
@@ -29,6 +60,7 @@ def _build_prompt(transcript: str, acoustic: dict) -> str:
     )
 
     onto_section = onto if onto else "(not yet populated)"
+    sleep_section = _sleep_blurb(recent_sleep(days=7))
 
     return f"""{lens}
 
@@ -41,6 +73,11 @@ def _build_prompt(transcript: str, acoustic: dict) -> str:
 
 ## Recent reflections (most recent first)
 {history}
+
+---
+
+## Recent sleep (Eight Sleep, last 3 nights)
+{sleep_section}
 
 ---
 
