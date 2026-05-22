@@ -11,7 +11,6 @@
 <p align="center">
   <a href="#use-cases">Use cases</a> ·
   <a href="#how-it-works">How it works</a> ·
-  <a href="#what-this-demonstrates">What this demonstrates</a> ·
   <a href="#setup">Setup</a>
 </p>
 
@@ -73,18 +72,6 @@ q: what would it look like to fully commit, and what are you protecting by not?
 - **Inconsistency detection** — flags when a reflection contradicts your stated values or goals; queues proposed ontology edits for your review
 - **Ad-hoc queries** — reply to the iMessage thread, get answers grounded in your history
 - **Fully private** — runs on your Mac, data stays local, only the text prompt reaches the Claude API
-
----
-
-## What this demonstrates
-
-For anyone reading this as a portfolio piece — what's actually interesting under the hood:
-
-- **End-to-end personal data pipeline.** iCloud file watcher → local Whisper inference (MLX, Apple Silicon) → DSP feature extraction (librosa) → LLM reasoning with structured JSON output → SQLite persistence → iMessage delivery via AppleScript. Six different runtime substrates wired together so the user just speaks and gets a text back.
-- **System design under real constraints.** Runs as a launchd job with kqueue file-event watching (not polling), handles iCloud's lazy file download semantics, survives sleep/wake cycles, respects subprocess argument-size limits, and isolates large reference artifacts from the per-reflection prompt so daily inference stays fast.
-- **Stateful AI architecture.** Every reflection is evaluated against a versioned personal ontology, a rolling history window, and an "inconsistency" criterion. The system proposes structured ontology edits which the user reviews before accepting — a human-in-the-loop loop, not autonomous drift.
-- **Privacy-first by construction.** Audio never leaves the Mac. Transcription is local. Personal data lives in gitignored files. Only the synthesized text prompt reaches the LLM API. A non-technical user couldn't accidentally leak.
-- **Product-engineering taste.** The user-facing surface is a text message. Everything else is invisible infrastructure. Two minutes of voice → 20 seconds of structured reflection in your pocket, no app to open, no UI to manage.
 
 ---
 
