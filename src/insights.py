@@ -69,7 +69,8 @@ def _extract_json(text: str) -> dict:
 def generate(transcript: str, acoustic: dict) -> tuple[dict, str]:
     prompt = _build_prompt(transcript, acoustic)
     result = subprocess.run(
-        ["claude", "-p", prompt],
+        ["claude", "-p"],
+        input=prompt,
         capture_output=True,
         text=True,
         timeout=180,
