@@ -33,6 +33,11 @@ WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 IMESSAGE_RECIPIENT = "+1XXXXXXXXXX"
 OWNER_HANDLES = ("+1XXXXXXXXXX",)
 
+# Apple ID handle to send iMessages FROM. None = use first available iMessage
+# service (default macOS behavior, may flip between handles). Set to a specific
+# handle (e.g. "pudgebot@icloud.com") to lock in a consistent sender identity.
+IMESSAGE_SENDER = None
+
 try:
     from config_local import *  # noqa: F401, F403
 except ImportError:

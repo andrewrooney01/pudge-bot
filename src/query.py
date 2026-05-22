@@ -48,7 +48,7 @@ to answer, say so plainly rather than guessing."""
 def answer(question: str) -> tuple[str, str]:
     prompt = _build_prompt(question)
     result = subprocess.run(
-        ["claude", "-p"],
+        ["claude", "-p", "--bare", "--no-session-persistence"],
         input=prompt,
         capture_output=True,
         text=True,

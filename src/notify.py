@@ -1,6 +1,6 @@
 import subprocess
 
-from config import IMESSAGE_RECIPIENT
+from config import IMESSAGE_RECIPIENT, IMESSAGE_SENDER
 
 
 def _escape_applescript(s: str) -> str:
@@ -28,9 +28,19 @@ def format_message(parsed: dict, acoustic: dict) -> str:
 
 def send(message: str, recipient: str = IMESSAGE_RECIPIENT) -> None:
     safe = _escape_applescript(message)
+    # If IMESSAGE_SENDER is set, send from that specific Apple ID handle so the
+    # recipient always sees the same sender identity. Otherwise fall back to
+    # whichever iMessage service Messages happens to list first.
+    if IMESSAGE_SENDER:
+        service_clause = (
+            f'set targetService to 1st service '
+            f'whose service type = iMessage and description = "{IMESSAGE_SENDER}"'
+        )
+    else:
+        service_clause = 'set targetService to 1st service whose service type = iMessage'
     script = (
         f'tell application "Messages"\n'
-        f'  set targetService to 1st service whose service type = iMessage\n'
+        f'  {service_clause}\n'
         f'  set targetBuddy to buddy "{recipient}" of targetService\n'
         f'  send "{safe}" to targetBuddy\n'
         f"end tell"
