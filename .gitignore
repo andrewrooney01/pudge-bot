@@ -12,7 +12,4 @@ venv/
 .DS_Store
 philosophy.md
 src/config_local.py
-config/ontology/artifacts/complete_confidence.md
-config/ontology/artifacts/beginning_of_infinity.md
-config/ontology/artifacts/rational_optimist.md
-config/ontology/artifacts/sheenah_sessions.md
+config/ontology/artifacts/

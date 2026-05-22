@@ -23,7 +23,7 @@ reflections are below. Use them to answer truthfully and concisely.
 
 ---
 
-## User ontology
+## the user's ontology
 {onto_section}
 
 ---
@@ -34,7 +34,7 @@ reflections are below. Use them to answer truthfully and concisely.
 
 ---
 
-## User's question
+## the user's question
 
 \"\"\"
 {question}
