@@ -16,7 +16,9 @@
 
 ---
 
-The orb watches for new voice notes, transcribes them on-device, analyzes the acoustics, and texts you back within a minute — with mood, patterns, and one open question worth sitting with. Reply in the same thread to query your full reflection history. Over time it cross-references every voice note against a personal ontology you build (values, goals across every horizon, worldview, principles) and flags inconsistencies between who you say you are and what you actually said today.
+Most of what you think about yourself evaporates the moment you stop thinking it. The orb catches it: talk for two minutes, get back mood, themes, and one open question worth sitting with — under a minute, every time, no app to open.
+
+Reply in the same thread to query your full reflection history. Over time it cross-references every voice note against a personal ontology you build (values, goals across every horizon, worldview, principles) and flags inconsistencies between who you say you are and what you actually said today.
 
 It is a self-coaching system, a memory augment, and a small piece of personal infrastructure that runs quietly on your own machine.
 
