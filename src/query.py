@@ -8,7 +8,7 @@ from db import reflections_snapshot
 
 def _build_prompt(question: str) -> str:
     lens = LENS_PATH.read_text() if LENS_PATH.exists() else ""
-    onto = ontology.load()
+    onto = ontology.load(include_books=False)
     snapshot = reflections_snapshot(limit=20)
 
     onto_section = onto if onto else "(not yet populated)"
@@ -48,8 +48,7 @@ to answer, say so plainly rather than guessing."""
 def answer(question: str) -> tuple[str, str]:
     prompt = _build_prompt(question)
     result = subprocess.run(
-        ["claude", "-p", "--bare", "--no-session-persistence"],
-        input=prompt,
+        ["claude", "-p", prompt],
         capture_output=True,
         text=True,
         timeout=180,

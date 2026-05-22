@@ -2,7 +2,7 @@ import logging
 import sqlite3
 
 import db
-from config import CHAT_DB_PATH, OWNER_HANDLES
+from config import CHAT_DB_PATH, MAC_SENDER_HANDLES, OWNER_HANDLES
 
 log = logging.getLogger("orb.inbox")
 
@@ -30,11 +30,22 @@ def _max_rowid(c: sqlite3.Connection) -> int:
 
 
 def poll() -> list[dict]:
-    """Return new received iMessages since the last poll.
+    """Return new iMessages worth responding to since the last poll.
+
+    A "query" is any message that:
+      - involves one of the user's own handles (sender or recipient), AND
+      - was NOT sent from this Mac itself (i.e., not an orb output).
+
+    Distinguishing self-Apple-ID messages: when the user texts from their
+    iPhone to their iCloud email, iMessage marks `is_from_me=1` because the
+    sender is the same Apple ID, even though it physically came from a
+    different device. We use `destination_caller_id` (which records the
+    *sending handle*, not the device) to tell them apart:
+      - Mac-sent (orb output): destination_caller_id ∈ MAC_SENDER_HANDLES
+      - iPhone-sent (query):   destination_caller_id ∉ MAC_SENDER_HANDLES
 
     On first run, seeds the cursor at the current max ROWID so historical
-    messages aren't replayed. Subsequent runs return only messages newer
-    than the last seen ROWID, restricted to ones the user sent (is_from_me=0).
+    messages aren't replayed.
     """
     c = _open_chat_db()
     if c is None:
@@ -47,18 +58,23 @@ def poll() -> list[dict]:
             log.info("inbox cursor initialized at ROWID %d", current)
             return []
 
-        placeholders = ",".join("?" * len(OWNER_HANDLES))
+        owner_placeholders = ",".join("?" * len(OWNER_HANDLES))
+        mac_placeholders = ",".join("?" * len(MAC_SENDER_HANDLES)) if MAC_SENDER_HANDLES else "''"
         rows = c.execute(
             f"""SELECT m.ROWID AS rowid, m.text, m.date, h.id AS sender
                FROM message m
                JOIN handle h ON m.handle_id = h.ROWID
                WHERE m.ROWID > ?
-                 AND m.is_from_me = 0
                  AND m.text IS NOT NULL
                  AND m.text != ''
-                 AND h.id IN ({placeholders})
+                 AND h.id IN ({owner_placeholders})
+                 AND (
+                   m.is_from_me = 0
+                   OR (m.is_from_me = 1
+                       AND COALESCE(m.destination_caller_id, '') NOT IN ({mac_placeholders}))
+                 )
                ORDER BY m.ROWID ASC""",
-            (int(last_seen), *OWNER_HANDLES),
+            (int(last_seen), *OWNER_HANDLES, *MAC_SENDER_HANDLES),
         ).fetchall()
 
         msgs = [dict(r) for r in rows]
