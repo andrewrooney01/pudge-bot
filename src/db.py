@@ -81,6 +81,10 @@ def init():
         for ddl in [
             "ALTER TABLE philosophy_proposals ADD COLUMN file TEXT",
             "ALTER TABLE philosophy_proposals ADD COLUMN recording_id INTEGER",
+            "ALTER TABLE recordings ADD COLUMN source TEXT NOT NULL DEFAULT 'voice'",
+            "ALTER TABLE recordings ADD COLUMN note_id TEXT",
+            "ALTER TABLE recordings ADD COLUMN note_title TEXT",
+            "ALTER TABLE recordings ADD COLUMN note_modified_at TEXT",
         ]:
             try:
                 c.execute(ddl)
@@ -102,6 +106,39 @@ def insert_recording(audio_path: Path, recorded_at: datetime, duration: float) -
         cur = c.execute(
             "INSERT INTO recordings (audio_path, recorded_at, duration_sec) VALUES (?, ?, ?)",
             (str(audio_path), recorded_at.isoformat(), duration),
+        )
+        return cur.lastrowid
+
+
+def already_processed_note(note_id: str, modified_at: str) -> bool:
+    """A given (note_id, modified_at) snapshot is ingested at most once."""
+    with conn() as c:
+        row = c.execute(
+            "SELECT 1 FROM recordings "
+            "WHERE source = 'note' AND note_id = ? AND note_modified_at = ?",
+            (note_id, modified_at),
+        ).fetchone()
+        return row is not None
+
+
+def insert_note_reflection(
+    note_id: str,
+    title: str,
+    modified_at: str,
+    recorded_at: datetime,
+) -> int:
+    """Persist a note ingest as a row in recordings with source='note'.
+
+    audio_path is synthetic (`note:<id>@<modified_at>`) so the existing
+    UNIQUE NOT NULL constraint still holds without a schema migration.
+    """
+    synthetic_path = f"note:{note_id}@{modified_at}"
+    with conn() as c:
+        cur = c.execute(
+            "INSERT INTO recordings "
+            "(audio_path, recorded_at, source, note_id, note_title, note_modified_at) "
+            "VALUES (?, ?, 'note', ?, ?, ?)",
+            (synthetic_path, recorded_at.isoformat(), note_id, title, modified_at),
         )
         return cur.lastrowid
 
@@ -213,6 +250,7 @@ def reflections_snapshot(limit: int = 20) -> list[dict]:
     with conn() as c:
         rows = c.execute(
             """SELECT r.id, r.recorded_at, r.duration_sec,
+                      r.source, r.note_title,
                       t.text AS transcript,
                       i.summary, i.mood, i.themes, i.pattern, i.question,
                       a.speaking_rate_wpm, a.pause_ratio

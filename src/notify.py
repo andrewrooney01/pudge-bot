@@ -33,6 +33,19 @@ def format_message(parsed: dict, acoustic: dict) -> str:
     )
 
 
+def format_note_message(parsed: dict, title: str | None) -> str:
+    """Same shape as format_message, but with a note footer instead of acoustics."""
+    title_str = title if title else "untitled"
+    return (
+        f"orb · {parsed.get('mood', '?')}\n\n"
+        f"{parsed.get('summary', '')}\n\n"
+        f"themes: {parsed.get('themes', '—')}\n"
+        f"pattern: {parsed.get('pattern', '—')}\n\n"
+        f"q: {parsed.get('question', '—')}\n\n"
+        f"📓 note · \"{title_str}\""
+    )
+
+
 def send(message: str, bot: str = "pudge") -> None:
     """Send `message` to the named bot's chat."""
     b = bots.get(bot)
