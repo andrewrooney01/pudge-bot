@@ -1,5 +1,20 @@
 # Copy this file to config_local.py and fill in your values.
 # config_local.py is gitignored — your personal details stay local.
 
-IMESSAGE_RECIPIENT = "+1XXXXXXXXXX"       # your iPhone number
-OWNER_HANDLES = ("+1XXXXXXXXXX", "you@icloud.com")  # same number + Apple ID email
+# Telegram bots. Add as many as you want; each one is independent.
+# To set up:
+#   1. Create a bot via @BotFather on Telegram → get a token
+#   2. Start a DM with your bot (send /start)
+#   3. Run: python src/telegram_setup.py <your-bot-token>
+#      It'll print the chat_id; paste it below.
+TELEGRAM_BOTS = {
+    "pudge": {
+        "token": "PASTE_BOT_TOKEN_HERE",
+        "chat_id": 0,  # replace with your chat_id
+    },
+    # Example second bot:
+    # "habit": {
+    #     "token": "...",
+    #     "chat_id": ...,
+    # },
+}

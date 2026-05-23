@@ -16,8 +16,6 @@ PROJECT = HOME / "Projects" / "the-orb"
 JPR_DIR = HOME / "Library" / "Mobile Documents" / \
     "iCloud~com~openplanetsoftware~just-press-record" / "Documents"
 
-CHAT_DB_PATH = HOME / "Library" / "Messages" / "chat.db"
-
 DATA_DIR = PROJECT / "data"
 LOGS_DIR = PROJECT / "logs"
 CONFIG_DIR = PROJECT / "config"
@@ -29,22 +27,13 @@ ARTIFACTS_DIR = ONTOLOGY_DIR / "artifacts"
 
 WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 
-# Personal values — override in src/config_local.py (gitignored)
-IMESSAGE_RECIPIENT = "+1XXXXXXXXXX"
-OWNER_HANDLES = ("+1XXXXXXXXXX",)
-
-# Apple ID handle to send iMessages FROM. None = use first available iMessage
-# service (default macOS behavior, may flip between handles). Set to a specific
-# handle (e.g. "pudgebot@icloud.com") to lock in a consistent sender identity.
-IMESSAGE_SENDER = None
-
-# Handles this Mac uses to SEND iMessages from. The inbox poller uses these
-# to distinguish orb outputs (sent from this Mac) from user queries (sent
-# from another device of the same Apple ID, e.g. iPhone). When iMessage
-# marks a message `is_from_me=1`, the `destination_caller_id` column tells
-# us *which handle* originated it — if it's in this list, this Mac sent it
-# and the message is not a query.
-MAC_SENDER_HANDLES = ("you@icloud.com",)
+# Telegram bot registry. Each entry is {token, chat_id}. Override the whole
+# dict in `config_local.py` (gitignored) — do not put real tokens here.
+# Adding a new bot: drop a new entry into this dict; the rest of the pipeline
+# picks it up via `bots.get("name")`.
+TELEGRAM_BOTS: dict = {
+    "pudge": {"token": "", "chat_id": 0},
+}
 
 try:
     from config_local import *  # noqa: F401, F403

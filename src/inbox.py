@@ -1,88 +1,86 @@
-import logging
-import sqlite3
+"""Incoming messages — polls Telegram for new replies.
 
+Replaces the previous chat.db-based inbox. No more FDA, no more
+self-Apple-ID heuristics, no more destination_caller_id parsing.
+
+Each bot has its own update offset stored in the orb's state table.
+On every poll, we ask Telegram for updates with id > last_offset, filter
+to messages from the bot's owner (the configured chat_id), advance the
+offset to the last update seen, and return the new messages.
+"""
+import logging
+
+import bots
 import db
-from config import CHAT_DB_PATH, MAC_SENDER_HANDLES, OWNER_HANDLES
+from telegram_client import TelegramClient
 
 log = logging.getLogger("orb.inbox")
 
-STATE_KEY = "last_chat_rowid"
+
+def _state_key(bot_name: str) -> str:
+    return f"telegram_offset_{bot_name}"
 
 
-def _open_chat_db() -> sqlite3.Connection | None:
-    if not CHAT_DB_PATH.exists():
-        log.warning("chat.db not found at %s", CHAT_DB_PATH)
-        return None
-    try:
-        # Read-only; chat.db is owned by Messages.app and Full Disk Access
-        # is required for the launchd job to read it.
-        c = sqlite3.connect(f"file:{CHAT_DB_PATH}?mode=ro", uri=True)
-        c.row_factory = sqlite3.Row
-        return c
-    except sqlite3.OperationalError as e:
-        log.warning("can't open chat.db (Full Disk Access required?): %s", e)
-        return None
+def poll(bot: str = "pudge") -> list[dict]:
+    """Return new messages sent to the named bot since the last poll.
 
-
-def _max_rowid(c: sqlite3.Connection) -> int:
-    row = c.execute("SELECT MAX(ROWID) AS m FROM message").fetchone()
-    return row["m"] or 0
-
-
-def poll() -> list[dict]:
-    """Return new iMessages worth responding to since the last poll.
-
-    A "query" is any message that:
-      - involves one of the user's own handles (sender or recipient), AND
-      - was NOT sent from this Mac itself (i.e., not an orb output).
-
-    Distinguishing self-Apple-ID messages: when the user texts from their
-    iPhone to their iCloud email, iMessage marks `is_from_me=1` because the
-    sender is the same Apple ID, even though it physically came from a
-    different device. We use `destination_caller_id` (which records the
-    *sending handle*, not the device) to tell them apart:
-      - Mac-sent (orb output): destination_caller_id ∈ MAC_SENDER_HANDLES
-      - iPhone-sent (query):   destination_caller_id ∉ MAC_SENDER_HANDLES
-
-    On first run, seeds the cursor at the current max ROWID so historical
-    messages aren't replayed.
+    Returned dicts have shape:
+        {"update_id": int, "text": str, "sender": str, "bot": str}
     """
-    c = _open_chat_db()
-    if c is None:
-        return []
+    b = bots.get(bot)
+    client = TelegramClient(b.token)
+
+    state_key = _state_key(bot)
+    last_offset_str = db.get_state(state_key)
+    offset = int(last_offset_str) + 1 if last_offset_str else None
+
     try:
-        last_seen = db.get_state(STATE_KEY)
-        if last_seen is None:
-            current = _max_rowid(c)
-            db.set_state(STATE_KEY, str(current))
-            log.info("inbox cursor initialized at ROWID %d", current)
-            return []
+        updates = client.get_updates(offset=offset, timeout=0)
+    except Exception as e:
+        log.warning("getUpdates failed for bot=%s: %s", bot, e)
+        return []
 
-        owner_placeholders = ",".join("?" * len(OWNER_HANDLES))
-        mac_placeholders = ",".join("?" * len(MAC_SENDER_HANDLES)) if MAC_SENDER_HANDLES else "''"
-        rows = c.execute(
-            f"""SELECT m.ROWID AS rowid, m.text, m.date, h.id AS sender
-               FROM message m
-               JOIN handle h ON m.handle_id = h.ROWID
-               WHERE m.ROWID > ?
-                 AND m.text IS NOT NULL
-                 AND m.text != ''
-                 AND h.id IN ({owner_placeholders})
-                 AND (
-                   m.is_from_me = 0
-                   OR (m.is_from_me = 1
-                       AND COALESCE(m.destination_caller_id, '') NOT IN ({mac_placeholders}))
-                 )
-               ORDER BY m.ROWID ASC""",
-            (int(last_seen), *OWNER_HANDLES, *MAC_SENDER_HANDLES),
-        ).fetchall()
+    if not updates:
+        return []
 
-        msgs = [dict(r) for r in rows]
-        # Advance cursor to current DB max so non-owner messages aren't
-        # re-scanned on every poll.
-        current = _max_rowid(c)
-        if current > int(last_seen):
-            db.set_state(STATE_KEY, str(current))
-        return msgs
-    finally:
-        c.close()
+    messages = []
+    max_seen_id = None
+    for u in updates:
+        max_seen_id = u["update_id"]
+        msg = u.get("message") or u.get("edited_message")
+        if not msg:
+            continue
+        chat = msg.get("chat", {})
+        if chat.get("id") != b.chat_id:
+            # Messages from other chats are ignored (shouldn't happen with
+            # a private bot, but defensive).
+            continue
+        text = msg.get("text")
+        if not text:
+            continue
+        sender = (
+            msg.get("from", {}).get("username")
+            or str(msg.get("from", {}).get("id"))
+            or "unknown"
+        )
+        messages.append({
+            "update_id": u["update_id"],
+            "text": text,
+            "sender": sender,
+            "bot": bot,
+        })
+
+    # Advance the cursor past everything Telegram returned, even non-message
+    # updates, so we don't re-fetch them on the next poll.
+    if max_seen_id is not None:
+        db.set_state(state_key, str(max_seen_id))
+
+    return messages
+
+
+def poll_all() -> list[dict]:
+    """Poll every configured bot. Returned messages carry their `bot` name."""
+    out = []
+    for b in bots.all_bots():
+        out.extend(poll(b.name))
+    return out
