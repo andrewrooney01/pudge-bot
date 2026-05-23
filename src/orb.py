@@ -13,6 +13,7 @@ import acoustic
 import insights
 import notify
 import inbox
+import notes_inbox
 import query
 
 
@@ -106,6 +107,45 @@ def process(audio_path: Path) -> None:
     log.info("✓ done: %s", audio_path.name)
 
 
+def process_note(note: dict) -> None:
+    """Ingest a single Apple Note: fetch body, run insights, notify, persist."""
+    log.info("Processing note %s (%s)", note["id"][-8:], note["title"])
+
+    body = notes_inbox.fetch_body(note["id"])
+    if not body.strip():
+        log.info("  note is empty, skipping")
+        return
+    log.info("  body: %d chars", len(body))
+
+    log.info("  generating insights...")
+    parsed, raw = insights.generate(body, acoustic=None, source="note", title=note["title"])
+    log.info("  insight: [%s] %s", parsed.get("mood"), parsed.get("summary", "")[:80])
+    if parsed.get("inconsistencies"):
+        for tension in parsed["inconsistencies"]:
+            log.info("  ⚡ inconsistency: %s", tension)
+
+    log.info("  sending message...")
+    msg = notify.format_note_message(parsed, note["title"])
+    notify.send(msg)
+
+    rec_id = db.insert_note_reflection(
+        note["id"],
+        note["title"],
+        note["modified_at"],
+        note["modified_dt"],
+    )
+    db.save_transcript(rec_id, body, "en")
+    db.save_insights(rec_id, parsed, raw)
+    proposals = parsed.get("proposals") if isinstance(parsed.get("proposals"), list) else []
+    for prop in proposals:
+        if isinstance(prop, dict):
+            db.save_proposal(rec_id, prop.get("file", ""), prop.get("section", ""), prop.get("proposal", ""))
+    if proposals:
+        log.info("  %d ontology proposal(s) queued", len(proposals))
+
+    log.info("✓ done: note %s", note["title"])
+
+
 def answer_question(msg: dict) -> None:
     text = msg["text"]
     bot = msg.get("bot", "pudge")
@@ -131,6 +171,20 @@ def main() -> int:
                 log.error("failed processing %s\n%s", path, traceback.format_exc())
     else:
         log.debug("no new recordings")
+
+    try:
+        ready_notes = notes_inbox.find_ready_notes(db.already_processed_note)
+    except Exception:
+        ready_notes = []
+        log.error("failed listing notes\n%s", traceback.format_exc())
+    if ready_notes:
+        log.info("found %d ready note(s)", len(ready_notes))
+        for note in ready_notes:
+            try:
+                process_note(note)
+            except Exception:
+                failures += 1
+                log.error("failed processing note %s\n%s", note.get("id"), traceback.format_exc())
 
     questions = inbox.poll_all()
     if questions:

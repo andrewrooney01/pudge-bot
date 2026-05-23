@@ -16,6 +16,10 @@ PROJECT = HOME / "Projects" / "the-orb"
 JPR_DIR = HOME / "Library" / "Mobile Documents" / \
     "iCloud~com~openplanetsoftware~just-press-record" / "Documents"
 
+# Apple Notes ingest — orb picks up notes from this folder once they go quiet.
+NOTES_FOLDER = "Ideas"
+NOTE_QUIET_SECS = 6 * 3600  # ingest a note when it's been untouched this long
+
 DATA_DIR = PROJECT / "data"
 LOGS_DIR = PROJECT / "logs"
 CONFIG_DIR = PROJECT / "config"
