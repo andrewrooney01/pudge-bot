@@ -5,7 +5,7 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-from config import JPR_DIR, LOGS_DIR
+from config import JPR_DIR, LOGS_DIR, NOTE_MIN_BODY_CHARS
 
 import db
 import transcribe
@@ -112,8 +112,8 @@ def process_note(note: dict) -> None:
     log.info("Processing note %s (%s)", note["id"][-8:], note["title"])
 
     body = notes_inbox.fetch_body(note["id"])
-    if not body.strip():
-        log.info("  note is empty, skipping")
+    if len(body.strip()) < NOTE_MIN_BODY_CHARS:
+        log.info("  note body too short (%d chars), skipping", len(body.strip()))
         return
     log.info("  body: %d chars", len(body))
 
