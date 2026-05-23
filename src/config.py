@@ -29,6 +29,17 @@ ARTIFACTS_DIR = ONTOLOGY_DIR / "artifacts"
 
 WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 
+# Delivery channel for the orb's messages and queries.
+#   "imessage" — macOS Messages (default; requires Apple Silicon Mac)
+#   "telegram" — Telegram bot (cross-platform; set the two TELEGRAM_* values)
+CHANNEL = "imessage"
+
+# Telegram bot — only used when CHANNEL == "telegram". Create a bot with
+# @BotFather to get TELEGRAM_BOT_TOKEN, then DM the bot once and read your
+# numeric chat id (see README "Telegram setup"). Override in config_local.py.
+TELEGRAM_BOT_TOKEN = ""
+TELEGRAM_CHAT_ID = ""
+
 # Personal values — override in src/config_local.py (gitignored)
 IMESSAGE_RECIPIENT = "+1XXXXXXXXXX"
 OWNER_HANDLES = ("+1XXXXXXXXXX",)

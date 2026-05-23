@@ -5,7 +5,7 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-from config import JPR_DIR, LOGS_DIR
+from config import CHANNEL, JPR_DIR, LOGS_DIR
 
 import db
 import transcribe
@@ -13,7 +13,18 @@ import acoustic
 import insights
 import notify
 import inbox
+import telegram
 import query
+
+
+# Bind the delivery channel once. format_message lives in notify and is
+# channel-independent (plain text), so only send/poll vary.
+if CHANNEL == "telegram":
+    send = telegram.send
+    poll = telegram.poll
+else:
+    send = notify.send
+    poll = inbox.poll
 
 
 logging.basicConfig(
@@ -83,9 +94,9 @@ def process(audio_path: Path) -> None:
         for tension in parsed["inconsistencies"]:
             log.info("  ⚡ inconsistency: %s", tension)
 
-    log.info("  sending iMessage...")
+    log.info("  sending message...")
     msg = notify.format_message(parsed, a)
-    notify.send(msg)
+    send(msg)
 
     # Persist only after the full pipeline succeeds so a failed run is retried
     rec_id = db.insert_recording(
@@ -110,7 +121,7 @@ def answer_question(msg: dict) -> None:
     text = msg["text"]
     log.info("Answering: %s", text[:80])
     reply, raw = query.answer(text)
-    notify.send(reply)
+    send(reply)
     db.save_query(text, reply, raw, sender=msg.get("sender"))
     log.info("✓ answered (rowid=%s)", msg.get("rowid"))
 
@@ -131,7 +142,7 @@ def main() -> int:
     else:
         log.debug("no new recordings")
 
-    questions = inbox.poll()
+    questions = poll()
     if questions:
         log.info("found %d new message(s)", len(questions))
         for msg in questions:

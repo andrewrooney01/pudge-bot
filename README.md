@@ -123,14 +123,36 @@ pip install -r requirements.txt
 cp src/config_local.py.example src/config_local.py
 ```
 
-Edit `src/config_local.py` with your values:
+Edit `src/config_local.py` with your values. The orb can deliver over **iMessage** (default, macOS only) or **Telegram** (cross-platform):
 
 ```python
+# iMessage (default)
+CHANNEL = "imessage"
 IMESSAGE_RECIPIENT = "+1XXXXXXXXXX"
 OWNER_HANDLES = ("+1XXXXXXXXXX", "you@icloud.com")
 ```
 
-`config_local.py` is gitignored — your phone number and email never touch the repo.
+`config_local.py` is gitignored — your personal details never touch the repo.
+
+#### Telegram setup
+
+To use a Telegram bot instead of iMessage:
+
+1. In Telegram, message [@BotFather](https://t.me/BotFather), send `/newbot`, and follow the prompts. Copy the **bot token** it gives you.
+2. Open a chat with your new bot and send it any message (this lets the bot see your chat).
+3. Find your numeric **chat id**:
+   ```bash
+   curl "https://api.telegram.org/bot<TOKEN>/getUpdates"
+   ```
+   Read `result[].message.chat.id` from the JSON.
+4. Set the values in `src/config_local.py`:
+   ```python
+   CHANNEL = "telegram"
+   TELEGRAM_BOT_TOKEN = "123456:ABC-DEF..."
+   TELEGRAM_CHAT_ID = "987654321"
+   ```
+
+The Telegram path uses only the Bot API over HTTPS — no Full Disk Access, no Messages database, and it works whether or not you're on a Mac.
 
 ### 3. Fill in your ontology
 

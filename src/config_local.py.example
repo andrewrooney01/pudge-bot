@@ -1,5 +1,19 @@
 # Copy this file to config_local.py and fill in your values.
 # config_local.py is gitignored — your personal details stay local.
 
+# --- Choose ONE delivery channel ---------------------------------------
+# "imessage" (default, macOS only) or "telegram" (cross-platform).
+CHANNEL = "imessage"
+
+# --- iMessage channel (CHANNEL = "imessage") ---------------------------
 IMESSAGE_RECIPIENT = "+1XXXXXXXXXX"       # your iPhone number
 OWNER_HANDLES = ("+1XXXXXXXXXX", "you@icloud.com")  # same number + Apple ID email
+
+# --- Telegram channel (CHANNEL = "telegram") ---------------------------
+# 1. Message @BotFather, send /newbot, copy the token it gives you.
+# 2. Open a chat with your new bot and send it any message.
+# 3. Get your numeric chat id:
+#      curl "https://api.telegram.org/bot<TOKEN>/getUpdates"
+#    and read result[].message.chat.id from the JSON.
+TELEGRAM_BOT_TOKEN = ""
+TELEGRAM_CHAT_ID = ""
