@@ -18,7 +18,7 @@ JPR_DIR = HOME / "Library" / "Mobile Documents" / \
 
 # Apple Notes ingest — orb picks up notes from this folder once they go quiet.
 NOTES_FOLDER = "Ideas"
-NOTE_QUIET_SECS = 6 * 3600  # ingest a note when it's been untouched this long
+NOTE_QUIET_SECS = 3600  # ingest a note (or a fresh edit) once it's been untouched this long
 
 DATA_DIR = PROJECT / "data"
 LOGS_DIR = PROJECT / "logs"
