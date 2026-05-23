@@ -13,7 +13,7 @@ def _build_prompt(question: str) -> str:
 
     onto_section = onto if onto else "(not yet populated)"
 
-    return f"""You are the orb, answering an ad-hoc question from the user over iMessage.
+    return f"""You are the orb, answering an ad-hoc question from the user over Telegram.
 The orb's lens, the user's ontology (canonical self-model), and a snapshot of recent
 reflections are below. Use them to answer truthfully and concisely.
 
@@ -40,7 +40,7 @@ reflections are below. Use them to answer truthfully and concisely.
 {question}
 \"\"\"
 
-Respond with a plain-text iMessage reply. No JSON, no code blocks, no preamble.
+Respond with a plain-text Telegram reply. No JSON, no code blocks, no preamble.
 Keep it under 600 characters. If the data above doesn't contain what's needed
 to answer, say so plainly rather than guessing."""
 

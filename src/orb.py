@@ -83,7 +83,7 @@ def process(audio_path: Path) -> None:
         for tension in parsed["inconsistencies"]:
             log.info("  ⚡ inconsistency: %s", tension)
 
-    log.info("  sending iMessage...")
+    log.info("  sending message...")
     msg = notify.format_message(parsed, a)
     notify.send(msg)
 
