@@ -79,8 +79,8 @@ Personal use. Single user, Apple Silicon Mac. Not packaged for general distribut
 
 > **Privacy note:** Your Telegram bot tokens and chat id live in `src/config_local.py` (gitignored) — they never touch the repo.
 
-> [!CAUTION]
-> The ontology files in `config/ontology/` ship as empty templates and are tracked by git. Once you start filling them in with personal content, **keep the repo private** or add those files to your local `.gitignore`.
+> [!NOTE]
+> The ontology files ship as tracked `*.md.example` templates. Your live `config/ontology/*.md` files — the ones you actually fill in — are gitignored, so your personal content stays on your machine and never gets pushed. Sync them across devices with Obsidian (see below), not git.
 
 ---
 
@@ -148,7 +148,15 @@ TELEGRAM_BOTS = {
 
 ### 4. Fill in your ontology
 
-Open the files in `config/ontology/` and fill in what you know today. Start with `values.md` and `goals.md` — even partial content activates inconsistency detection. You'll iterate over time.
+Copy the templates to live files (the live `*.md` files are gitignored, so your content stays local):
+
+```bash
+for f in config/ontology/*.md.example; do cp -n "$f" "${f%.example}"; done
+```
+
+Then open the files in `config/ontology/` and fill in what you know today. Start with `values.md` and `goals.md` — even partial content activates inconsistency detection. You'll iterate over time.
+
+**Read and edit them in Obsidian (optional).** `config/ontology/` doubles as an [Obsidian](https://obsidian.md) vault — in Obsidian, *Open folder as vault* and point it at `config/ontology/`. The orb reads these as plain markdown, so editing in Obsidian is safe. To use them on both Mac and iOS, turn on **Obsidian Sync with end-to-end encryption** — that syncs the vault between devices without going through git (keeping your personal content out of the repo). Obsidian's own `.obsidian/` config folder is gitignored.
 
 ### 5. Set up the launchd job
 
@@ -201,7 +209,7 @@ tail -f logs/orb.log
 ```
 src/          pipeline code
 config/       launchd plists, lens prompt, ontology files
-config/ontology/
+config/ontology/  (*.md.example = tracked templates; live *.md are gitignored, also an Obsidian vault)
   identity.md       who you are, how you operate
   values.md         ranked values with explanations
   principles.md     rules you actually live by
