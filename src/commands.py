@@ -355,31 +355,59 @@ def _append_to_ontology(path, section: str, text: str) -> str:
 # /help
 # ---------------------------------------------------------------------------
 
-def cmd_help(_arg: str) -> str:
-    return (
-        "the orb · commands\n\n"
-        "— surface (instant) —\n"
-        "/today          reflections from today\n"
-        "/week           last 7 days, grouped\n"
-        "/month          last 30 days\n"
-        "/stats          totals: count, minutes, wpm\n"
-        "/themes         coverage tally + last touched\n"
-        "/mood           14-day mood + wpm sparkline\n"
-        "/search X       transcript hits for X\n"
-        "/snippets X     verbatim fragments around X\n"
-        "/proposals      pending ontology proposals\n"
-        "/accept N       apply proposal N\n"
-        "/dismiss N      drop proposal N\n"
-        "/anomaly        most acoustically-anomalous recent\n\n"
-        "— synthesis (LLM, ~20-30s) —\n"
-        "/digest [day|week|month]   synthesis paragraph\n"
-        "/drift                     values vs behavior gaps\n"
-        "/loops                     recurring patterns w/ quotes\n"
-        "/contradict                reflection-vs-reflection pairs\n"
-        "/replay N                  re-run insights vs today's ontology\n\n"
-        "/help           this list\n\n"
-        "anything not starting with / is a free-form question."
-    )
+# Single source of truth for command metadata. Drives both the /menu
+# output and the setMyCommands registration that powers the `/`
+# autocomplete drawer in Telegram clients.
+#
+# Keep descriptions short — Telegram truncates long ones in the drawer,
+# and the single-line `·` format below wraps badly past ~50 chars.
+COMMAND_CATALOG = [
+    # (cmd, drawer_description, menu_label, menu_description, tier)
+    ("today",      "reflections from today",                "today",          "today's reflections",          "surface"),
+    ("week",       "last 7 days, grouped by day",           "week",           "last 7 days",                  "surface"),
+    ("month",      "last 30 days",                          "month",          "last 30 days",                 "surface"),
+    ("stats",      "totals: count, minutes, wpm",           "stats",          "totals + wpm",                 "surface"),
+    ("themes",     "coverage tally + last touched",         "themes",         "coverage + last touched",      "surface"),
+    ("mood",       "14-day mood + wpm sparkline",           "mood",           "14-day sparkline",             "surface"),
+    ("search",     "transcript hits for a phrase",          "search X",       "transcript hits for X",        "surface"),
+    ("snippets",   "verbatim fragments around a phrase",    "snippets X",     "verbatim fragments around X",  "surface"),
+    ("proposals",  "pending ontology proposals",            "proposals",      "pending ontology proposals",   "surface"),
+    ("accept",     "apply proposal N",                      "accept N",       "apply proposal N",             "surface"),
+    ("dismiss",    "drop proposal N",                       "dismiss N",      "drop proposal N",              "surface"),
+    ("anomaly",    "most acoustically-outlier reflection",  "anomaly",        "most outlier reflection",      "surface"),
+    ("digest",     "synthesis paragraph (LLM, ~30s)",       "digest [d|w|m]", "synthesis paragraph",          "synthesis"),
+    ("drift",      "values vs behavior gaps (LLM, ~30s)",   "drift",          "values vs behavior gaps",      "synthesis"),
+    ("loops",      "recurring patterns w/ quotes (LLM)",    "loops",          "recurring patterns + quotes",  "synthesis"),
+    ("contradict", "cross-reflection contradictions (LLM)", "contradict",     "cross-reflection pairs",       "synthesis"),
+    ("replay",     "re-run #N vs today's ontology (LLM)",   "replay N",       "re-run vs today's ontology",   "synthesis"),
+    ("menu",       "this list",                             "menu",           "this list",                    "surface"),
+]
+
+
+def cmd_menu(_arg: str) -> str:
+    lines = ["the orb · menu", ""]
+    by_tier: dict[str, list[tuple[str, str]]] = {"surface": [], "synthesis": []}
+    for _cmd, _drawer, label, desc, tier in COMMAND_CATALOG:
+        by_tier[tier].append((label, desc))
+
+    lines.append("— surface (instant) —")
+    for label, desc in by_tier["surface"]:
+        lines.append(f"/{label} · {desc}")
+    lines.append("")
+    lines.append("— synthesis (LLM, ~20-30s) —")
+    for label, desc in by_tier["synthesis"]:
+        lines.append(f"/{label} · {desc}")
+    lines.append("")
+    lines.append("anything not starting with / is a free-form question.")
+    return "\n".join(lines)
+
+
+def telegram_command_payload() -> list[dict]:
+    """Drives `TelegramClient.set_my_commands` → the `/` autocomplete drawer."""
+    return [
+        {"command": cmd, "description": drawer}
+        for cmd, drawer, _label, _desc, _tier in COMMAND_CATALOG
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -742,5 +770,6 @@ _ROUTES = {
     "contradict": cmd_contradict,
     "anomaly": cmd_anomaly,
     "replay": cmd_replay,
-    "help": cmd_help,
+    "menu": cmd_menu,
+    "help": cmd_menu,  # alias — muscle memory from before the rename
 }

@@ -85,6 +85,17 @@ class TelegramClient:
             last = self._call("sendMessage", **payload)
         return last or {}
 
+    def set_my_commands(self, commands: list[dict]) -> dict:
+        """Register the bot's command list with Telegram.
+
+        Each `commands` item is `{"command": "name", "description": "..."}`.
+        The result powers the `/` autocomplete drawer in Telegram clients —
+        users see a tappable list the moment they type `/` to this bot.
+
+        Idempotent: re-calling overwrites the previous list.
+        """
+        return self._call("setMyCommands", commands=commands)
+
     def get_updates(
         self,
         offset: int | None = None,

@@ -27,10 +27,13 @@ import traceback
 
 from config import LOGS_DIR
 
+import bots
+import commands
 import db
 import inbox
 import notes_inbox
 import orb
+from telegram_client import TelegramClient
 
 
 logging.basicConfig(
@@ -131,9 +134,24 @@ def _install_signal_handlers() -> None:
     signal.signal(signal.SIGINT, _handle)
 
 
+def _register_telegram_commands() -> None:
+    """Push the slash-command catalog to Telegram so the `/` autocomplete
+    drawer reflects what the bot actually understands. Best-effort —
+    failure here is not fatal, the daemon still runs.
+    """
+    payload = commands.telegram_command_payload()
+    for bot in bots.all_bots():
+        try:
+            TelegramClient(bot.token).set_my_commands(payload)
+            log.info("registered %d commands with %s", len(payload), bot.name)
+        except Exception:
+            log.warning("setMyCommands failed for bot=%s", bot.name, exc_info=True)
+
+
 def main() -> int:
     log.info("orb daemon starting (pid=%d)", os.getpid())
     db.init()
+    _register_telegram_commands()
     _install_signal_handlers()
 
     scanner = threading.Thread(target=_scanner_loop, name="scanner", daemon=True)
