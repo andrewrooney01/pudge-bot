@@ -155,15 +155,19 @@ Open the files in `config/ontology/` and fill in what you know today. Start with
 The plists in `config/` have a path placeholder — swap it for your home directory:
 
 ```bash
-sed -i '' "s|/Users/PLACEHOLDER|$HOME|g" config/com.theorb.watcher.plist config/com.theorb.autopull.plist
+sed -i '' "s|/Users/PLACEHOLDER|$HOME|g" config/com.theorb.daemon.plist config/com.theorb.autopull.plist
 ```
 
 Then load it:
 
 ```bash
-cp config/com.theorb.watcher.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.theorb.watcher.plist
+cp config/com.theorb.daemon.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.theorb.daemon.plist
 ```
+
+The daemon runs continuously: a long-poll connection to Telegram (so chat
+replies are sub-second) and a 60s background scan for new voice notes and
+Apple Notes. launchd's `KeepAlive` restarts it if it ever crashes.
 
 ### 6. Grant Full Disk Access
 
@@ -180,7 +184,9 @@ echo $(pwd)/.venv/bin/python
 
 ### 7. Test it
 
-Record a voice note in Just Press Record. Wait 60–90 seconds. You should get a Telegram message from your bot.
+Send `/help` to your bot in Telegram — you should get a sub-second reply
+listing the available commands. Then record a voice note in Just Press
+Record; the background scanner picks it up within 60s.
 
 Check logs if nothing arrives:
 

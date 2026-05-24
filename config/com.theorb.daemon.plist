@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.theorb.watcher</string>
+    <string>com.theorb.daemon</string>
 
     <key>ProgramArguments</key>
     <array>
         <string>/Users/PLACEHOLDER/Projects/the-orb/.venv/bin/python</string>
-        <string>/Users/PLACEHOLDER/Projects/the-orb/src/orb.py</string>
+        <string>/Users/PLACEHOLDER/Projects/the-orb/src/daemon.py</string>
     </array>
 
     <key>WorkingDirectory</key>
@@ -22,11 +22,14 @@
         <string>/Users/PLACEHOLDER</string>
     </dict>
 
-    <key>StartInterval</key>
-    <integer>60</integer>
-
     <key>RunAtLoad</key>
     <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
 
     <key>StandardOutPath</key>
     <string>/Users/PLACEHOLDER/Projects/the-orb/logs/launchd.out</string>
