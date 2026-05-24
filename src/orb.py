@@ -15,6 +15,7 @@ import notify
 import inbox
 import notes_inbox
 import query
+import commands
 
 
 logging.basicConfig(
@@ -97,6 +98,8 @@ def process(audio_path: Path) -> None:
     db.save_transcript(rec_id, t["text"], t["language"])
     db.save_acoustic(rec_id, a)
     db.save_insights(rec_id, parsed, raw)
+    inconsistencies = parsed.get("inconsistencies") if isinstance(parsed.get("inconsistencies"), list) else []
+    db.save_inconsistencies(rec_id, [x for x in inconsistencies if isinstance(x, str)])
     proposals = parsed.get("proposals") if isinstance(parsed.get("proposals"), list) else []
     for prop in proposals:
         if isinstance(prop, dict):
@@ -136,6 +139,8 @@ def process_note(note: dict) -> None:
     )
     db.save_transcript(rec_id, body, "en")
     db.save_insights(rec_id, parsed, raw)
+    inconsistencies = parsed.get("inconsistencies") if isinstance(parsed.get("inconsistencies"), list) else []
+    db.save_inconsistencies(rec_id, [x for x in inconsistencies if isinstance(x, str)])
     proposals = parsed.get("proposals") if isinstance(parsed.get("proposals"), list) else []
     for prop in proposals:
         if isinstance(prop, dict):
@@ -150,6 +155,15 @@ def answer_question(msg: dict) -> None:
     text = msg["text"]
     bot = msg.get("bot", "pudge")
     log.info("Answering (bot=%s): %s", bot, text[:80])
+
+    # Slash-commands are deterministic and skip the LLM path entirely.
+    command_reply = commands.dispatch(text)
+    if command_reply is not None:
+        notify.send(command_reply, bot=bot)
+        db.save_query(text, command_reply, command_reply, sender=msg.get("sender"))
+        log.info("✓ handled command (update_id=%s)", msg.get("update_id"))
+        return
+
     reply, raw = query.answer(text)
     notify.send(reply, bot=bot)
     db.save_query(text, reply, raw, sender=msg.get("sender"))

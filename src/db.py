@@ -1,6 +1,7 @@
+import json
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from config import DB_PATH
@@ -60,6 +61,43 @@ CREATE TABLE IF NOT EXISTS queries (
     answer TEXT,
     raw_response TEXT
 );
+
+CREATE TABLE IF NOT EXISTS inconsistencies (
+    id INTEGER PRIMARY KEY,
+    recording_id INTEGER NOT NULL REFERENCES recordings(id),
+    text TEXT NOT NULL,
+    surfaced_at TEXT NOT NULL DEFAULT (datetime('now')),
+    status TEXT NOT NULL DEFAULT 'open'
+);
+CREATE INDEX IF NOT EXISTS idx_inconsistencies_rec ON inconsistencies(recording_id);
+"""
+
+# FTS5 mirror over transcripts.text. Kept in sync via triggers below. rowid
+# matches recording_id so we can join back without a separate column.
+#
+# Bumped when the FTS schema/tokenizer changes — init() drops and rebuilds
+# the virtual table when this disagrees with state.
+FTS_VERSION = "2"
+FTS_SCHEMA = """
+CREATE VIRTUAL TABLE IF NOT EXISTS transcripts_fts USING fts5(
+    text,
+    content='transcripts',
+    content_rowid='recording_id',
+    tokenize='unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS transcripts_ai AFTER INSERT ON transcripts BEGIN
+    INSERT INTO transcripts_fts(rowid, text) VALUES (new.recording_id, new.text);
+END;
+CREATE TRIGGER IF NOT EXISTS transcripts_ad AFTER DELETE ON transcripts BEGIN
+    INSERT INTO transcripts_fts(transcripts_fts, rowid, text)
+    VALUES ('delete', old.recording_id, old.text);
+END;
+CREATE TRIGGER IF NOT EXISTS transcripts_au AFTER UPDATE ON transcripts BEGIN
+    INSERT INTO transcripts_fts(transcripts_fts, rowid, text)
+    VALUES ('delete', old.recording_id, old.text);
+    INSERT INTO transcripts_fts(rowid, text) VALUES (new.recording_id, new.text);
+END;
 """
 
 
@@ -90,6 +128,68 @@ def init():
                 c.execute(ddl)
             except sqlite3.OperationalError:
                 pass
+
+        _ensure_fts(c)
+        _backfill_inconsistencies(c)
+
+
+def _ensure_fts(c: sqlite3.Connection) -> None:
+    """Create FTS if missing; rebuild if FTS_VERSION changed."""
+    current = c.execute(
+        "SELECT value FROM state WHERE key = 'fts_version'"
+    ).fetchone()
+    needs_rebuild = not current or current["value"] != FTS_VERSION
+    if needs_rebuild:
+        c.executescript(
+            "DROP TRIGGER IF EXISTS transcripts_ai;"
+            "DROP TRIGGER IF EXISTS transcripts_ad;"
+            "DROP TRIGGER IF EXISTS transcripts_au;"
+            "DROP TABLE IF EXISTS transcripts_fts;"
+        )
+    c.executescript(FTS_SCHEMA)
+    row = c.execute("SELECT COUNT(*) AS n FROM transcripts_fts").fetchone()
+    if not row or row["n"] == 0:
+        c.execute(
+            "INSERT INTO transcripts_fts(rowid, text) "
+            "SELECT recording_id, text FROM transcripts"
+        )
+    c.execute(
+        "INSERT INTO state (key, value) VALUES ('fts_version', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (FTS_VERSION,),
+    )
+
+
+def _backfill_inconsistencies(c: sqlite3.Connection) -> None:
+    """Lift inconsistencies out of historical insights.raw_response JSON.
+
+    Runs once — skipped if any rows already exist. After this, the ingest
+    pipeline writes directly via save_inconsistencies.
+    """
+    row = c.execute("SELECT COUNT(*) AS n FROM inconsistencies").fetchone()
+    if row and row["n"] > 0:
+        return
+    rows = c.execute(
+        "SELECT recording_id, raw_response FROM insights "
+        "WHERE raw_response IS NOT NULL AND raw_response != ''"
+    ).fetchall()
+    for r in rows:
+        raw = r["raw_response"] or ""
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start < 0 or end <= start:
+            continue
+        try:
+            parsed = json.loads(raw[start : end + 1])
+        except json.JSONDecodeError:
+            continue
+        items = parsed.get("inconsistencies") or []
+        for item in items:
+            if isinstance(item, str) and item.strip():
+                c.execute(
+                    "INSERT INTO inconsistencies (recording_id, text) VALUES (?, ?)",
+                    (r["recording_id"], item.strip()),
+                )
 
 
 def already_processed(audio_path: Path) -> bool:
@@ -244,6 +344,171 @@ def pending_proposals(limit: int = 20) -> list[dict]:
             (limit,),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def save_inconsistencies(rec_id: int, items: list[str]) -> None:
+    if not items:
+        return
+    with conn() as c:
+        for item in items:
+            if isinstance(item, str) and item.strip():
+                c.execute(
+                    "INSERT INTO inconsistencies (recording_id, text) VALUES (?, ?)",
+                    (rec_id, item.strip()),
+                )
+
+
+def reflections_between(start: datetime, end: datetime) -> list[dict]:
+    """Reflections with recorded_at in [start, end). Newest first."""
+    with conn() as c:
+        rows = c.execute(
+            """SELECT r.id, r.recorded_at, r.source, r.note_title,
+                      r.duration_sec,
+                      i.summary, i.mood, i.themes, i.question,
+                      a.speaking_rate_wpm
+               FROM recordings r
+               LEFT JOIN insights i ON i.recording_id = r.id
+               LEFT JOIN acoustic a ON a.recording_id = r.id
+               WHERE r.recorded_at >= ? AND r.recorded_at < ?
+               ORDER BY r.recorded_at DESC""",
+            (start.isoformat(), end.isoformat()),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def overall_stats() -> dict:
+    """Totals: reflections, total minutes, avg wpm, voice/note split."""
+    with conn() as c:
+        row = c.execute(
+            """SELECT
+                 COUNT(*)                                       AS total,
+                 COALESCE(SUM(r.duration_sec), 0)               AS total_sec,
+                 SUM(CASE WHEN r.source = 'voice' THEN 1 ELSE 0 END) AS voice_count,
+                 SUM(CASE WHEN r.source = 'note'  THEN 1 ELSE 0 END) AS note_count,
+                 MIN(r.recorded_at)                             AS first_at,
+                 MAX(r.recorded_at)                             AS last_at
+               FROM recordings r"""
+        ).fetchone()
+        wpm_row = c.execute(
+            "SELECT AVG(speaking_rate_wpm) AS avg_wpm FROM acoustic "
+            "WHERE speaking_rate_wpm IS NOT NULL"
+        ).fetchone()
+        return {
+            **dict(row),
+            "avg_wpm": wpm_row["avg_wpm"],
+        }
+
+
+def theme_stats() -> list[dict]:
+    """Per-coverage-area count + most-recent recorded_at."""
+    AREAS = ("physical", "emotional", "mental", "professional")
+    with conn() as c:
+        rows = c.execute(
+            """SELECT i.themes, r.recorded_at
+               FROM insights i JOIN recordings r ON r.id = i.recording_id
+               WHERE i.themes IS NOT NULL AND i.themes != ''"""
+        ).fetchall()
+    counts = {a: 0 for a in AREAS}
+    last_seen: dict[str, str] = {}
+    for row in rows:
+        themes = [t.strip().lower() for t in (row["themes"] or "").split(",")]
+        for area in AREAS:
+            if area in themes:
+                counts[area] += 1
+                if area not in last_seen or row["recorded_at"] > last_seen[area]:
+                    last_seen[area] = row["recorded_at"]
+    return [
+        {"area": a, "count": counts[a], "last_seen": last_seen.get(a)}
+        for a in AREAS
+    ]
+
+
+def mood_series(days: int = 14) -> list[dict]:
+    """One row per day for the last `days` days: date, avg wpm, mood words.
+
+    Days with multiple reflections collapse moods into a "/"-joined string.
+    Days with no reflection appear with mood=None, wpm=None — caller decides
+    how to render the gap.
+    """
+    cutoff = (datetime.now() - timedelta(days=days)).date()
+    with conn() as c:
+        rows = c.execute(
+            """SELECT date(r.recorded_at) AS day,
+                      GROUP_CONCAT(i.mood, '/') AS moods,
+                      AVG(a.speaking_rate_wpm)  AS avg_wpm
+               FROM recordings r
+               LEFT JOIN insights i ON i.recording_id = r.id
+               LEFT JOIN acoustic a ON a.recording_id = r.id
+               WHERE date(r.recorded_at) >= ?
+               GROUP BY date(r.recorded_at)
+               ORDER BY day ASC""",
+            (cutoff.isoformat(),),
+        ).fetchall()
+    by_day = {r["day"]: dict(r) for r in rows}
+    out = []
+    for i in range(days, -1, -1):
+        d = (datetime.now() - timedelta(days=i)).date().isoformat()
+        if d in by_day:
+            out.append(by_day[d])
+        else:
+            out.append({"day": d, "moods": None, "avg_wpm": None})
+    return out
+
+
+def search_transcripts(phrase: str, limit: int = 10) -> list[dict]:
+    """FTS5 search — newest matches first. Returns id, date, summary, mood."""
+    with conn() as c:
+        rows = c.execute(
+            """SELECT r.id, r.recorded_at, r.source, r.note_title,
+                      i.summary, i.mood
+               FROM transcripts_fts f
+               JOIN recordings r  ON r.id = f.rowid
+               LEFT JOIN insights i ON i.recording_id = r.id
+               WHERE transcripts_fts MATCH ?
+               ORDER BY r.recorded_at DESC
+               LIMIT ?""",
+            (phrase, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def snippet_transcripts(phrase: str, limit: int = 10) -> list[dict]:
+    """FTS5 snippet() — returns text fragments around each match.
+
+    Snippet window is ~30 tokens with ‹…› markers around the match.
+    """
+    with conn() as c:
+        rows = c.execute(
+            """SELECT r.id, r.recorded_at,
+                      snippet(transcripts_fts, 0, '«', '»', '…', 16) AS frag
+               FROM transcripts_fts f
+               JOIN recordings r ON r.id = f.rowid
+               WHERE transcripts_fts MATCH ?
+               ORDER BY r.recorded_at DESC
+               LIMIT ?""",
+            (phrase, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_proposal(prop_id: int) -> dict | None:
+    with conn() as c:
+        row = c.execute(
+            "SELECT id, file, section, proposal, status FROM philosophy_proposals "
+            "WHERE id = ?",
+            (prop_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def set_proposal_status(prop_id: int, status: str) -> bool:
+    """Returns True if a row was updated."""
+    with conn() as c:
+        cur = c.execute(
+            "UPDATE philosophy_proposals SET status = ? WHERE id = ?",
+            (status, prop_id),
+        )
+        return cur.rowcount > 0
 
 
 def reflections_snapshot(limit: int = 20) -> list[dict]:
