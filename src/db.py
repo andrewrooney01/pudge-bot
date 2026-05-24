@@ -491,6 +491,111 @@ def snippet_transcripts(phrase: str, limit: int = 10) -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def inconsistencies_recent(days: int = 30, limit: int = 50) -> list[dict]:
+    """Inconsistencies surfaced for reflections recorded in the last N days."""
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    with conn() as c:
+        rows = c.execute(
+            """SELECT inc.id, inc.text, inc.surfaced_at, r.recorded_at
+               FROM inconsistencies inc
+               JOIN recordings r ON r.id = inc.recording_id
+               WHERE r.recorded_at >= ?
+               ORDER BY r.recorded_at DESC
+               LIMIT ?""",
+            (cutoff, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def acoustic_baseline() -> dict:
+    """Mean + std of speaking_rate_wpm, pitch_std, pause_ratio across all voice recordings."""
+    with conn() as c:
+        row = c.execute(
+            """SELECT
+                 AVG(speaking_rate_wpm) AS wpm_mean,
+                 AVG(pitch_std)         AS pitch_std_mean,
+                 AVG(pause_ratio)       AS pause_ratio_mean,
+                 COUNT(*)               AS n
+               FROM acoustic
+               WHERE speaking_rate_wpm IS NOT NULL
+                 AND pitch_std IS NOT NULL
+                 AND pause_ratio IS NOT NULL"""
+        ).fetchone()
+        base = dict(row) if row else {}
+        # sqlite has no STDEV — compute in Python.
+        rows = c.execute(
+            """SELECT speaking_rate_wpm, pitch_std, pause_ratio
+               FROM acoustic
+               WHERE speaking_rate_wpm IS NOT NULL
+                 AND pitch_std IS NOT NULL
+                 AND pause_ratio IS NOT NULL"""
+        ).fetchall()
+    n = base.get("n") or 0
+    if n < 2:
+        return {**base, "wpm_std": None, "pitch_std_std": None, "pause_ratio_std": None}
+
+    def _std(values, mean):
+        return (sum((v - mean) ** 2 for v in values) / (len(values) - 1)) ** 0.5
+
+    wpms = [r["speaking_rate_wpm"] for r in rows]
+    pitches = [r["pitch_std"] for r in rows]
+    pauses = [r["pause_ratio"] for r in rows]
+    return {
+        **base,
+        "wpm_std": _std(wpms, base["wpm_mean"]),
+        "pitch_std_std": _std(pitches, base["pitch_std_mean"]),
+        "pause_ratio_std": _std(pauses, base["pause_ratio_mean"]),
+    }
+
+
+def acoustic_in_window(days: int = 30) -> list[dict]:
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    with conn() as c:
+        rows = c.execute(
+            """SELECT r.id, r.recorded_at,
+                      a.speaking_rate_wpm, a.pitch_std, a.pause_ratio,
+                      i.summary, i.mood
+               FROM acoustic a
+               JOIN recordings r ON r.id = a.recording_id
+               LEFT JOIN insights i ON i.recording_id = r.id
+               WHERE r.recorded_at >= ?
+                 AND a.speaking_rate_wpm IS NOT NULL
+                 AND a.pitch_std IS NOT NULL
+                 AND a.pause_ratio IS NOT NULL
+               ORDER BY r.recorded_at DESC""",
+            (cutoff,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def reflection_full(rec_id: int) -> dict | None:
+    """Everything needed to replay a single reflection."""
+    with conn() as c:
+        row = c.execute(
+            """SELECT r.id, r.recorded_at, r.source, r.note_title, r.duration_sec,
+                      t.text AS transcript, t.language,
+                      i.summary, i.mood, i.themes, i.pattern, i.question,
+                      i.raw_response,
+                      a.pitch_mean, a.pitch_std, a.energy_mean,
+                      a.speaking_rate_wpm, a.pause_ratio
+               FROM recordings r
+               LEFT JOIN transcripts t ON t.recording_id = r.id
+               LEFT JOIN insights i    ON i.recording_id = r.id
+               LEFT JOIN acoustic a    ON a.recording_id = r.id
+               WHERE r.id = ?""",
+            (rec_id,),
+        ).fetchone()
+        if not row:
+            return None
+        result = dict(row)
+        inc_rows = c.execute(
+            "SELECT text FROM inconsistencies WHERE recording_id = ? ORDER BY id",
+            (rec_id,),
+        ).fetchall()
+        result["inconsistencies"] = [r["text"] for r in inc_rows]
+        return result
+
+
 def get_proposal(prop_id: int) -> dict | None:
     with conn() as c:
         row = c.execute(
