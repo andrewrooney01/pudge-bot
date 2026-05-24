@@ -13,3 +13,10 @@ venv/
 philosophy.md
 src/config_local.py
 config/ontology/artifacts/
+
+# Live ontology — your personal content. Tracked templates ship as *.md.example;
+# copy them to *.md and fill in. The live files stay local (never pushed).
+config/ontology/*.md
+
+# Obsidian vault config (per-machine; config/ontology/ doubles as a vault)
+.obsidian/
