@@ -21,21 +21,26 @@ def _state_key(bot_name: str) -> str:
     return f"telegram_offset_{bot_name}"
 
 
-def poll(bot: str = "pudge") -> list[dict]:
+def poll(bot: str = "pudge", timeout: int = 0) -> list[dict]:
     """Return new messages sent to the named bot since the last poll.
+
+    `timeout` is forwarded to Telegram's getUpdates. 0 = short-poll (returns
+    immediately, used by the one-shot orb.py main()). >0 = long-poll (the
+    API holds the connection open until a message arrives or `timeout`
+    seconds pass, used by the daemon).
 
     Returned dicts have shape:
         {"update_id": int, "text": str, "sender": str, "bot": str}
     """
     b = bots.get(bot)
-    client = TelegramClient(b.token)
+    client = TelegramClient(b.token, timeout=max(timeout + 10, 30))
 
     state_key = _state_key(bot)
     last_offset_str = db.get_state(state_key)
     offset = int(last_offset_str) + 1 if last_offset_str else None
 
     try:
-        updates = client.get_updates(offset=offset, timeout=0)
+        updates = client.get_updates(offset=offset, timeout=timeout)
     except Exception as e:
         log.warning("getUpdates failed for bot=%s: %s", bot, e)
         return []
@@ -78,9 +83,9 @@ def poll(bot: str = "pudge") -> list[dict]:
     return messages
 
 
-def poll_all() -> list[dict]:
+def poll_all(timeout: int = 0) -> list[dict]:
     """Poll every configured bot. Returned messages carry their `bot` name."""
     out = []
     for b in bots.all_bots():
-        out.extend(poll(b.name))
+        out.extend(poll(b.name, timeout=timeout))
     return out
