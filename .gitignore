@@ -13,3 +13,6 @@ venv/
 philosophy.md
 src/config_local.py
 config/ontology/artifacts/
+
+# Obsidian vault config (per-machine; config/ontology/ doubles as a vault)
+.obsidian/
