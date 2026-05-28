@@ -91,6 +91,11 @@ def template_h2_headings(text: str) -> list[str]:
     return [line[3:].strip() for line in text.splitlines() if line.startswith("## ")]
 
 
+def _heading_base(heading: str) -> str:
+    """Strip date/year qualifiers so `Today — 2026-05-15` matches `Today — 2026-05-27`."""
+    return re.split(r"\s+[—\-]|\s+\(", heading, maxsplit=1)[0].strip().lower()
+
+
 def has_meaningful_content(path: Path) -> bool:
     """True if file has non-comment, non-blank content under any heading."""
     if not path.exists():
@@ -231,9 +236,10 @@ def validate(parsed: dict, templates: dict) -> list[str]:
         if expected_h1 and not body.lstrip().startswith(expected_h1):
             errors.append(f"{fname}: must start with `{expected_h1}`")
         expected_h2s = template_h2_headings(templates[fname])
+        body_h2_bases = {_heading_base(l[3:].strip()) for l in body.splitlines() if l.startswith("## ")}
         for h2 in expected_h2s:
-            if f"## {h2}" not in body:
-                errors.append(f"{fname}: missing H2 `## {h2}`")
+            if _heading_base(h2) not in body_h2_bases:
+                errors.append(f"{fname}: missing H2 matching `## {h2}` (base `{_heading_base(h2)}`)")
         if "```" in body:
             errors.append(f"{fname}: contains a triple-backtick fence")
         if fname == "goals.md" and "*Draft seeded from reflections" not in body:
