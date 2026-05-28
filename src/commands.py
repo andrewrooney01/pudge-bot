@@ -361,52 +361,81 @@ def _append_to_ontology(path, section: str, text: str) -> str:
 #
 # Keep descriptions short — Telegram truncates long ones in the drawer,
 # and the single-line `·` format below wraps badly past ~50 chars.
+# Grouped by purpose so the menu makes the bot's role obvious at a glance:
+# triage = the daily action (review what the orb surfaced)
+# edit   = pointer to Obsidian, which owns the master plan now
+# reflect = read-only lookups
+# Drawer column slims the `/` autocomplete to daily drivers; the rest still
+# work when typed but aren't in the popup.
 COMMAND_CATALOG = [
-    # (cmd, drawer_description, menu_label, menu_description, tier)
-    ("today",      "reflections from today",                "today",          "today's reflections",          "surface"),
-    ("week",       "last 7 days, grouped by day",           "week",           "last 7 days",                  "surface"),
-    ("month",      "last 30 days",                          "month",          "last 30 days",                 "surface"),
-    ("stats",      "totals: count, minutes, wpm",           "stats",          "totals + wpm",                 "surface"),
-    ("themes",     "coverage tally + last touched",         "themes",         "coverage + last touched",      "surface"),
-    ("mood",       "14-day mood + wpm sparkline",           "mood",           "14-day sparkline",             "surface"),
-    ("search",     "transcript hits for a phrase",          "search X",       "transcript hits for X",        "surface"),
-    ("snippets",   "verbatim fragments around a phrase",    "snippets X",     "verbatim fragments around X",  "surface"),
-    ("proposals",  "pending ontology proposals",            "proposals",      "pending ontology proposals",   "surface"),
-    ("accept",     "apply proposal N",                      "accept N",       "apply proposal N",             "surface"),
-    ("dismiss",    "drop proposal N",                       "dismiss N",      "drop proposal N",              "surface"),
-    ("anomaly",    "most acoustically-outlier reflection",  "anomaly",        "most outlier reflection",      "surface"),
-    ("digest",     "synthesis paragraph (LLM, ~30s)",       "digest [d|w|m]", "synthesis paragraph",          "synthesis"),
-    ("drift",      "values vs behavior gaps (LLM, ~30s)",   "drift",          "values vs behavior gaps",      "synthesis"),
-    ("loops",      "recurring patterns w/ quotes (LLM)",    "loops",          "recurring patterns + quotes",  "synthesis"),
-    ("contradict", "cross-reflection contradictions (LLM)", "contradict",     "cross-reflection pairs",       "synthesis"),
-    ("replay",     "re-run #N vs today's ontology (LLM)",   "replay N",       "re-run vs today's ontology",   "synthesis"),
-    ("menu",       "this list",                             "menu",           "this list",                    "surface"),
+    # (cmd, drawer_description, menu_label, menu_description, group, in_drawer)
+    ("proposals",  "pending ontology proposals",            "proposals",      "pending ontology proposals",   "triage",  True),
+    ("accept",     "apply proposal N",                      "accept N",       "apply proposal N",             "triage",  True),
+    ("dismiss",    "drop proposal N",                       "dismiss N",      "drop proposal N",              "triage",  True),
+    ("drift",      "values vs behavior gaps (LLM, ~30s)",   "drift",          "values vs behavior gaps",      "triage",  True),
+    ("contradict", "cross-reflection contradictions (LLM)", "contradict",     "cross-reflection pairs",       "triage",  True),
+    ("anomaly",    "most acoustically-outlier reflection",  "anomaly",        "most outlier reflection",      "triage",  False),
+    ("replay",     "re-run #N vs today's ontology (LLM)",   "replay N",       "re-run vs today's ontology",   "triage",  False),
+    ("edit",       "open Obsidian vault for the master plan", "edit",         "open Obsidian vault",          "edit",    True),
+    ("today",      "reflections from today",                "today",          "today's reflections",          "reflect", True),
+    ("week",       "last 7 days, grouped by day",           "week",           "last 7 days",                  "reflect", True),
+    ("month",      "last 30 days",                          "month",          "last 30 days",                 "reflect", False),
+    ("stats",      "totals: count, minutes, wpm",           "stats",          "totals + wpm",                 "reflect", False),
+    ("themes",     "coverage tally + last touched",         "themes",         "coverage + last touched",      "reflect", False),
+    ("mood",       "14-day mood + wpm sparkline",           "mood",           "14-day sparkline",             "reflect", False),
+    ("search",     "transcript hits for a phrase",          "search X",       "transcript hits for X",        "reflect", False),
+    ("snippets",   "verbatim fragments around a phrase",    "snippets X",     "verbatim fragments around X",  "reflect", False),
+    ("digest",     "synthesis paragraph (LLM, ~30s)",       "digest [d|w|m]", "synthesis paragraph",          "reflect", False),
+    ("loops",      "recurring patterns w/ quotes (LLM)",    "loops",          "recurring patterns + quotes",  "reflect", False),
+    ("menu",       "this list",                             "menu",           "this list",                    "utility", True),
+]
+
+_GROUP_HEADERS = [
+    ("triage",  "— triage (the daily action) —"),
+    ("edit",    "— edit your master plan —"),
+    ("reflect", "— reflect (lookups + synthesis) —"),
 ]
 
 
 def cmd_menu(_arg: str) -> str:
     lines = ["the orb · menu", ""]
-    by_tier: dict[str, list[tuple[str, str]]] = {"surface": [], "synthesis": []}
-    for _cmd, _drawer, label, desc, tier in COMMAND_CATALOG:
-        by_tier[tier].append((label, desc))
+    by_group: dict[str, list[tuple[str, str]]] = {}
+    for _cmd, _drawer, label, desc, group, _drawer_on in COMMAND_CATALOG:
+        by_group.setdefault(group, []).append((label, desc))
 
-    lines.append("— surface (instant) —")
-    for label, desc in by_tier["surface"]:
-        lines.append(f"/{label} · {desc}")
-    lines.append("")
-    lines.append("— synthesis (LLM, ~20-30s) —")
-    for label, desc in by_tier["synthesis"]:
-        lines.append(f"/{label} · {desc}")
-    lines.append("")
+    for group, header in _GROUP_HEADERS:
+        if not by_group.get(group):
+            continue
+        lines.append(header)
+        for label, desc in by_group[group]:
+            lines.append(f"/{label} · {desc}")
+        lines.append("")
+
     lines.append("anything not starting with / is a free-form question.")
     return "\n".join(lines)
 
 
+def cmd_edit(_arg: str) -> str:
+    """Point the user at Obsidian — the master-plan editing surface."""
+    return (
+        "edit your master plan in Obsidian:\n"
+        f"obsidian://open?vault={ONTOLOGY_DIR.name}\n"
+        f"path: {ONTOLOGY_DIR}\n\n"
+        "the orb reads your live edits on the next reflection."
+    )
+
+
 def telegram_command_payload() -> list[dict]:
-    """Drives `TelegramClient.set_my_commands` → the `/` autocomplete drawer."""
+    """Drives `TelegramClient.set_my_commands` → the `/` autocomplete drawer.
+
+    Slimmed to daily drivers — the rest of COMMAND_CATALOG still works when
+    typed, just isn't in the popup. Cuts the visual noise the user complained
+    about without removing functionality.
+    """
     return [
         {"command": cmd, "description": drawer}
-        for cmd, drawer, _label, _desc, _tier in COMMAND_CATALOG
+        for cmd, drawer, _label, _desc, _group, in_drawer in COMMAND_CATALOG
+        if in_drawer
     ]
 
 
@@ -770,6 +799,7 @@ _ROUTES = {
     "contradict": cmd_contradict,
     "anomaly": cmd_anomaly,
     "replay": cmd_replay,
+    "edit": cmd_edit,
     "menu": cmd_menu,
     "help": cmd_menu,  # alias — muscle memory from before the rename
 }
