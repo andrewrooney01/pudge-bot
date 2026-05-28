@@ -77,10 +77,10 @@ q: what would it look like to fully commit, and what are you protecting by not?
 
 Personal use. Single user, Apple Silicon Mac. Not packaged for general distribution — but straightforward to clone and run if you follow the setup below.
 
-> **Privacy note:** Your Telegram bot tokens and chat id live in `src/config_local.py` (gitignored) — they never touch the repo.
+> **Privacy note (public repo):** This repo is public; your personal content is not. The DB (`data/orb.db`), audio (`*.m4a`, `*.wav`, `*.mp3`, `*.transcript`), bot tokens (`src/config_local.py`), launchd plists, and live ontology files (`config/pudge-bot/*.md`) are all gitignored. A pre-commit hook at `scripts/pre-commit` enforces this — install with `ln -sf ../../scripts/pre-commit .git/hooks/pre-commit` after cloning. The only thing that leaves your machine is the Claude CLI prompt for insights/seeding, same posture as the existing pipeline.
 
 > [!NOTE]
-> The ontology files ship as tracked `*.md.example` templates. Your live `config/ontology/*.md` files — the ones you actually fill in — are gitignored, so your personal content stays on your machine and never gets pushed. Sync them across devices with Obsidian (see below), not git.
+> The ontology files ship as tracked `*.md.example` templates in `config/ontology/`. Your live editable copies live in `config/pudge-bot/` (gitignored, also an Obsidian vault). Sync them across devices with Obsidian Sync (E2E encrypted), not git.
 
 ---
 
@@ -116,6 +116,9 @@ cd the-orb
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+# install the personal-content pre-commit guard (public repo, private content)
+ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
 ```
 
 ### 2. Create your Telegram bot
@@ -148,15 +151,25 @@ TELEGRAM_BOTS = {
 
 ### 4. Fill in your ontology
 
-Copy the templates to live files (the live `*.md` files are gitignored, so your content stays local):
+Copy the templates to live files in `config/pudge-bot/` (the live `*.md` files are gitignored, so your content stays local):
 
 ```bash
-for f in config/ontology/*.md.example; do cp -n "$f" "${f%.example}"; done
+mkdir -p config/pudge-bot
+for f in config/ontology/*.md.example; do cp -n "$f" "config/pudge-bot/$(basename "${f%.example}")"; done
 ```
 
-Then open the files in `config/ontology/` and fill in what you know today. Start with `values.md` and `goals.md` — even partial content activates inconsistency detection. You'll iterate over time.
+Then open the files in `config/pudge-bot/` and fill in what you know today. Start with `values.md` and `goals.md` — even partial content activates inconsistency detection. You'll iterate over time.
 
-**Read and edit them in Obsidian (optional).** `config/ontology/` doubles as an [Obsidian](https://obsidian.md) vault — in Obsidian, *Open folder as vault* and point it at `config/ontology/`. The orb reads these as plain markdown, so editing in Obsidian is safe. To use them on both Mac and iOS, turn on **Obsidian Sync with end-to-end encryption** — that syncs the vault between devices without going through git (keeping your personal content out of the repo). Obsidian's own `.obsidian/` config folder is gitignored.
+**Or seed from existing reflections.** If you've already been recording for a while, the orb can distill a first draft from your accumulated reflections:
+
+```bash
+python scripts/seed_ontology.py --dry-run    # preview what it would do
+python scripts/seed_ontology.py              # write first-draft files + mark proposals seeded
+```
+
+The seed reads from the local DB, calls Claude CLI once, and writes draft markdown to `config/pudge-bot/*.md`. Review and curate in Obsidian afterward — the orb picks up your edits on the next reflection.
+
+**Read and edit them in Obsidian.** `config/pudge-bot/` doubles as an [Obsidian](https://obsidian.md) vault — in Obsidian, *Open folder as vault* and point it at `config/pudge-bot/`. The orb reads these as plain markdown, so editing in Obsidian is safe. To use them on both Mac and iOS, turn on **Obsidian Sync with end-to-end encryption** — that syncs the vault between devices without going through git (keeping your personal content out of the repo). Obsidian's own `.obsidian/` config folder is gitignored.
 
 ### 5. Set up the launchd job
 
@@ -209,9 +222,11 @@ tail -f logs/orb.log
 ## Repo layout
 
 ```
-src/          pipeline code
-config/       launchd plists, lens prompt, ontology files
-config/ontology/  (*.md.example = tracked templates; live *.md are gitignored, also an Obsidian vault)
+src/              pipeline code
+scripts/          one-shot tools (seed_ontology.py, pre-commit hook)
+config/           launchd plists + lens prompt
+config/ontology/  tracked *.md.example templates (no personal content)
+config/pudge-bot/ live ontology (gitignored, also your Obsidian vault)
   identity.md       who you are, how you operate
   values.md         ranked values with explanations
   principles.md     rules you actually live by

@@ -27,8 +27,9 @@ CONFIG_DIR = PROJECT / "config"
 
 DB_PATH = DATA_DIR / "orb.db"
 LENS_PATH = CONFIG_DIR / "lens.md"
-ONTOLOGY_DIR = CONFIG_DIR / "ontology"
+ONTOLOGY_DIR = CONFIG_DIR / "pudge-bot"
 ARTIFACTS_DIR = ONTOLOGY_DIR / "artifacts"
+TEMPLATES_DIR = CONFIG_DIR / "ontology"
 
 WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 
@@ -45,5 +46,5 @@ try:
 except ImportError:
     pass
 
-for d in (DATA_DIR, LOGS_DIR, CONFIG_DIR, ONTOLOGY_DIR, ARTIFACTS_DIR):
+for d in (DATA_DIR, LOGS_DIR, CONFIG_DIR, ARTIFACTS_DIR):
     d.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Local belt-and-braces against committing personal content to a public repo.
+# Install with:  ln -sf ../../scripts/pre-commit .git/hooks/pre-commit && chmod +x scripts/pre-commit
+
+set -e
+
+BLOCKED_PATTERNS=(
+    '^config/pudge-bot/.*\.md$'
+    '^config/ontology/[^.]*\.md$'   # live, not .example
+    '^data/'
+    '^logs/'
+    '^philosophy\.md$'
+    '^src/config_local\.py$'
+    '\.m4a$'
+    '\.wav$'
+    '\.mp3$'
+    '\.transcript$'
+    '\.env$'
+)
+
+staged=$(git diff --cached --name-only --diff-filter=AM)
+
+violations=""
+while IFS= read -r file; do
+    [ -z "$file" ] && continue
+    for pat in "${BLOCKED_PATTERNS[@]}"; do
+        if echo "$file" | grep -qE "$pat"; then
+            violations+="  $file  (matches $pat)"$'\n'
+            break
+        fi
+    done
+done <<< "$staged"
+
+if [ -n "$violations" ]; then
+    echo "✗ pre-commit blocked: personal-content paths staged"
+    echo "$violations"
+    echo "If this is a false positive, edit scripts/pre-commit (or .git/hooks/pre-commit) and reinstall."
+    exit 1
+fi

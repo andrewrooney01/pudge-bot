@@ -5,6 +5,12 @@ logs/
 *.sqlite3
 .env
 .env.local
+
+# Audio + transcripts — personal content from voice memos, never commit.
+*.m4a
+*.wav
+*.mp3
+*.transcript
 __pycache__/
 *.pyc
 .venv/
