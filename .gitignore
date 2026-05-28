@@ -13,10 +13,18 @@ venv/
 philosophy.md
 src/config_local.py
 config/ontology/artifacts/
+config/pudge-bot/artifacts/
+
+# Live launchd plists — per-machine paths. Tracked templates ship as *.plist.example;
+# copy them to *.plist and replace /Users/PLACEHOLDER with your home dir.
+config/com.theorb.*.plist
+!config/com.theorb.*.plist.example
 
 # Live ontology — your personal content. Tracked templates ship as *.md.example;
 # copy them to *.md and fill in. The live files stay local (never pushed).
 config/ontology/*.md
+config/pudge-bot/*.md
 
-# Obsidian vault config (per-machine; config/ontology/ doubles as a vault)
+# Obsidian vault config (per-machine; config/pudge-bot/ doubles as a vault)
 .obsidian/
+config/pudge-bot/.obsidian/

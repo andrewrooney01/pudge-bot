@@ -160,9 +160,11 @@ Then open the files in `config/ontology/` and fill in what you know today. Start
 
 ### 5. Set up the launchd job
 
-The plists in `config/` have a path placeholder — swap it for your home directory:
+The plists ship as `*.plist.example` templates with a path placeholder. Copy them to live `*.plist` files (gitignored, per-machine) and swap the placeholder for your home directory:
 
 ```bash
+cp config/com.theorb.daemon.plist.example config/com.theorb.daemon.plist
+cp config/com.theorb.autopull.plist.example config/com.theorb.autopull.plist
 sed -i '' "s|/Users/PLACEHOLDER|$HOME|g" config/com.theorb.daemon.plist config/com.theorb.autopull.plist
 ```
 
