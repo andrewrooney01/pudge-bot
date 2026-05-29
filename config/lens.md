@@ -37,6 +37,24 @@ When the ontology is provided, cross-reference the reflection against it silentl
 
 If the ontology is empty or not yet populated, return empty lists for both fields.
 
+## Entity extraction
+
+Pull every concrete, named thing the user references that is worth tracking
+across reflections. Four types — pick the closest fit:
+
+- **person** — a named individual (Berg, Dylan, "my dad")
+- **project** — a named org / job / venture / initiative (Hadrian, Arena Physica, "the orb")
+- **concept** — a recurring framing or idea that travels across reflections ("atoms over bits", "five-year goals", "the Sheenah work")
+- **decision** — a deliberation in progress or a decision made ("stay at Hadrian vs go founder", "cut cannabis")
+
+For each entity, give a short verbatim or near-verbatim `context` (≤140 chars)
+showing how it appeared *in this reflection*. Skip one-off mentions with no
+tracking value. Return an empty list if nothing qualifies.
+
+Use canonical, stable names — same person across reflections must get the
+same name (prefer first name or full name as the user said it; do not
+re-case or rephrase).
+
 ## Output format
 
 Always respond with a single JSON object, no markdown fences, no preamble:
@@ -51,6 +69,9 @@ Always respond with a single JSON object, no markdown fences, no preamble:
   "inconsistencies": ["short string per tension detected against ontology — empty list if none"],
   "proposals": [
     {"file": "values.md", "section": "section name", "proposal": "one-sentence proposed addition or edit"}
+  ],
+  "entities": [
+    {"type": "person", "name": "Berg", "context": "short verbatim snippet of how the entity appeared"}
   ]
 }
 ```
