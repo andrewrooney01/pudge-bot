@@ -11,7 +11,7 @@ os.environ["PATH"] = os.pathsep.join([
     "/usr/local/bin",
     os.environ.get("PATH", ""),
 ])
-PROJECT = HOME / "Projects" / "the-orb"
+PROJECT = Path(__file__).resolve().parent.parent
 
 JPR_DIR = HOME / "Library" / "Mobile Documents" / \
     "iCloud~com~openplanetsoftware~just-press-record" / "Documents"
