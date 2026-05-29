@@ -28,3 +28,6 @@ config/pudge-bot/*.md
 # Obsidian vault config (per-machine; config/pudge-bot/ doubles as a vault)
 .obsidian/
 config/pudge-bot/.obsidian/
+
+# config/pudge-bot is now its own private repo (pudge-bot-notes) — ignore wholesale
+config/pudge-bot/
