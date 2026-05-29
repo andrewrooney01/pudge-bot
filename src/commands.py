@@ -15,6 +15,7 @@ import subprocess
 from datetime import datetime, timedelta
 
 import db
+import horizons
 import insights
 import notify
 import ontology
@@ -375,6 +376,9 @@ COMMAND_CATALOG = [
     ("accept",     "apply proposal N",                      "accept N",       "apply proposal N",             "surface"),
     ("dismiss",    "drop proposal N",                       "dismiss N",      "drop proposal N",              "surface"),
     ("anomaly",    "most acoustically-outlier reflection",  "anomaly",        "most outlier reflection",      "surface"),
+    ("entity",     "timeline for a tracked person/project",  "entity X",       "timeline for X",               "surface"),
+    ("entities",   "list tracked entities (most-mentioned)", "entities",       "most-mentioned tracked things","surface"),
+    ("horizons",   "goal pulse across every horizon",        "horizons",       "goal pulse + drift flags",     "surface"),
     ("digest",     "synthesis paragraph (LLM, ~30s)",       "digest [d|w|m]", "synthesis paragraph",          "synthesis"),
     ("drift",      "values vs behavior gaps (LLM, ~30s)",   "drift",          "values vs behavior gaps",      "synthesis"),
     ("loops",      "recurring patterns w/ quotes (LLM)",    "loops",          "recurring patterns + quotes",  "synthesis"),
@@ -690,6 +694,92 @@ def cmd_anomaly(_arg: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# /entity, /entities — world-model surface
+# ---------------------------------------------------------------------------
+
+_KIND_GLYPH = {
+    "person":   "👤",
+    "project":  "🏗",
+    "concept":  "💡",
+    "decision": "⚖️",
+}
+
+
+def cmd_entity(arg: str) -> str:
+    if not arg:
+        return "usage: /entity <name>"
+    matches = db.entity_search(arg, limit=5)
+    if not matches:
+        return f'no tracked entity matching "{arg}".'
+    # If the user typed something close to a unique match, render its timeline.
+    # Otherwise show the disambiguation list.
+    if len(matches) == 1 or matches[0]["mentions"] >= 2 * (matches[1]["mentions"] if len(matches) > 1 else 0):
+        top = matches[0]
+        timeline = db.entity_timeline(top["kind"], top["slug"], limit=30)
+        if not timeline:
+            return f'"{top["name"]}" is registered but has no mentions logged.'
+        glyph = _KIND_GLYPH.get(top["kind"], "·")
+        lines = [
+            f"{glyph} {top['name']} · {top['kind']} · {top['mentions']} mention{'s' if top['mentions']!=1 else ''}",
+            f"first {top['first_seen'][:10]} · last {top['last_seen'][:10]}",
+            "",
+        ]
+        for row in timeline[-15:]:
+            date = row["recorded_at"][:10]
+            mood = row["mood"] or "—"
+            ctx = (row["context"] or "").replace("\n", " ").strip()
+            if not ctx and row["summary"]:
+                ctx = _first_sentence(row["summary"], 120)
+            lines.append(f"[{date}] {mood}")
+            if ctx:
+                lines.append(f"  {ctx}")
+        return "\n".join(lines)
+
+    lines = [f"multiple matches for \"{arg}\":", ""]
+    for m in matches:
+        glyph = _KIND_GLYPH.get(m["kind"], "·")
+        lines.append(f"{glyph} {m['name']} · {m['kind']} · {m['mentions']} mentions")
+    lines.append("")
+    lines.append("retry with a more specific name.")
+    return "\n".join(lines)
+
+
+def cmd_horizons(_arg: str) -> str:
+    rows = horizons.score()
+    return horizons.render_for_telegram(rows)
+
+
+def cmd_entities(_arg: str) -> str:
+    rows = db.entity_search("", limit=200)
+    if not rows:
+        return "no entities tracked yet — they're extracted from new reflections."
+    by_kind: dict[str, list[dict]] = {}
+    for r in rows:
+        by_kind.setdefault(r["kind"], []).append(r)
+
+    today = datetime.now().date()
+    lines = [f"entities tracked · {len(rows)} distinct", ""]
+    for kind in ("person", "project", "concept", "decision"):
+        bucket = by_kind.get(kind) or []
+        if not bucket:
+            continue
+        glyph = _KIND_GLYPH.get(kind, "·")
+        lines.append(f"— {glyph} {kind} ({len(bucket)}) —")
+        for r in bucket[:12]:
+            last = r["last_seen"][:10]
+            try:
+                delta = (today - datetime.fromisoformat(last).date()).days
+                last_str = "today" if delta == 0 else f"{delta}d ago"
+            except ValueError:
+                last_str = last
+            lines.append(f"  {r['name']:30s} {r['mentions']:3d} · last {last_str}")
+        if len(bucket) > 12:
+            lines.append(f"  …(+{len(bucket) - 12} more)")
+        lines.append("")
+    return "\n".join(lines).rstrip()
+
+
+# ---------------------------------------------------------------------------
 # /replay <id> — re-run insights against current ontology
 # ---------------------------------------------------------------------------
 
@@ -769,6 +859,9 @@ _ROUTES = {
     "loops": cmd_loops,
     "contradict": cmd_contradict,
     "anomaly": cmd_anomaly,
+    "entity": cmd_entity,
+    "entities": cmd_entities,
+    "horizons": cmd_horizons,
     "replay": cmd_replay,
     "menu": cmd_menu,
     "help": cmd_menu,  # alias — muscle memory from before the rename

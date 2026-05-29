@@ -70,6 +70,21 @@ CREATE TABLE IF NOT EXISTS inconsistencies (
     status TEXT NOT NULL DEFAULT 'open'
 );
 CREATE INDEX IF NOT EXISTS idx_inconsistencies_rec ON inconsistencies(recording_id);
+
+-- One row per (reflection, entity mention). `slug` is the canonical
+-- lookup key (lowercased + safe chars); `name` preserves the display form
+-- as the user said it; `kind` is one of person/project/concept/decision.
+CREATE TABLE IF NOT EXISTS entity_mentions (
+    id INTEGER PRIMARY KEY,
+    recording_id INTEGER NOT NULL REFERENCES recordings(id),
+    kind TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    name TEXT NOT NULL,
+    context TEXT,
+    seen_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_entity_mentions_rec  ON entity_mentions(recording_id);
+CREATE INDEX IF NOT EXISTS idx_entity_mentions_slug ON entity_mentions(kind, slug);
 """
 
 # FTS5 mirror over transcripts.text. Kept in sync via triggers below. rowid
@@ -356,6 +371,122 @@ def save_inconsistencies(rec_id: int, items: list[str]) -> None:
                     "INSERT INTO inconsistencies (recording_id, text) VALUES (?, ?)",
                     (rec_id, item.strip()),
                 )
+
+
+# ---------------------------------------------------------------------------
+# Entity mentions — populated from insights JSON, materialized into the
+# vault by src/vault.py as one markdown file per (kind, slug) entity.
+# ---------------------------------------------------------------------------
+
+_ENTITY_KINDS = ("person", "project", "concept", "decision")
+
+
+def entity_slug(name: str) -> str:
+    """Stable filesystem-safe slug. Lowercased, spaces → '-', strip junk."""
+    import re
+    s = (name or "").strip().lower()
+    s = re.sub(r"[^\w\s-]", "", s, flags=re.UNICODE)
+    s = re.sub(r"\s+", "-", s).strip("-")
+    return s or "unnamed"
+
+
+def save_entities(rec_id: int, items: list[dict]) -> list[dict]:
+    """Persist entity mentions; return the cleaned list actually saved."""
+    saved: list[dict] = []
+    if not items:
+        return saved
+    with conn() as c:
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            kind = (item.get("type") or "").strip().lower()
+            name = (item.get("name") or "").strip()
+            ctx = (item.get("context") or "").strip()
+            if kind not in _ENTITY_KINDS or not name:
+                continue
+            slug = entity_slug(name)
+            c.execute(
+                "INSERT INTO entity_mentions (recording_id, kind, slug, name, context) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (rec_id, kind, slug, name, ctx),
+            )
+            saved.append({"kind": kind, "slug": slug, "name": name, "context": ctx})
+    return saved
+
+
+def entity_timeline(kind: str | None, slug: str, limit: int = 200) -> list[dict]:
+    """Every mention of an entity, oldest first. `kind=None` searches across kinds."""
+    sql = """SELECT em.kind, em.name, em.context, r.id AS recording_id,
+                    r.recorded_at, r.source, r.note_title,
+                    i.mood, i.summary
+             FROM entity_mentions em
+             JOIN recordings r ON r.id = em.recording_id
+             LEFT JOIN insights i ON i.recording_id = r.id
+             WHERE em.slug = ?"""
+    args: list = [slug]
+    if kind:
+        sql += " AND em.kind = ?"
+        args.append(kind)
+    sql += " ORDER BY r.recorded_at ASC LIMIT ?"
+    args.append(limit)
+    with conn() as c:
+        rows = c.execute(sql, args).fetchall()
+        return [dict(r) for r in rows]
+
+
+def entity_search(query: str, limit: int = 20) -> list[dict]:
+    """Fuzzy entity lookup by name substring. Returns one row per distinct entity."""
+    q = f"%{(query or '').strip().lower()}%"
+    with conn() as c:
+        rows = c.execute(
+            """SELECT em.kind, em.slug,
+                      MAX(em.name) AS name,
+                      COUNT(*)     AS mentions,
+                      MIN(r.recorded_at) AS first_seen,
+                      MAX(r.recorded_at) AS last_seen
+               FROM entity_mentions em
+               JOIN recordings r ON r.id = em.recording_id
+               WHERE LOWER(em.name) LIKE ? OR em.slug LIKE ?
+               GROUP BY em.kind, em.slug
+               ORDER BY mentions DESC, last_seen DESC
+               LIMIT ?""",
+            (q, q, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def entities_for_recording(rec_id: int) -> list[dict]:
+    """All entities mentioned in a single reflection."""
+    with conn() as c:
+        rows = c.execute(
+            "SELECT kind, slug, name, context FROM entity_mentions "
+            "WHERE recording_id = ? ORDER BY id",
+            (rec_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def recordings_without_entities() -> list[int]:
+    """Recording ids whose transcript has never been run through entity extraction.
+
+    Used by the backfill script. A recording with zero entities is treated as
+    "never processed" — at worst this re-extracts for genuinely empty ones,
+    which is cheap and idempotent (we wipe + re-insert per recording).
+    """
+    with conn() as c:
+        rows = c.execute(
+            """SELECT r.id
+               FROM recordings r
+               LEFT JOIN entity_mentions em ON em.recording_id = r.id
+               WHERE em.id IS NULL
+               ORDER BY r.recorded_at ASC"""
+        ).fetchall()
+        return [r["id"] for r in rows]
+
+
+def clear_entities_for_recording(rec_id: int) -> None:
+    with conn() as c:
+        c.execute("DELETE FROM entity_mentions WHERE recording_id = ?", (rec_id,))
 
 
 def reflections_between(start: datetime, end: datetime) -> list[dict]:

@@ -16,6 +16,7 @@ import inbox
 import notes_inbox
 import query
 import commands
+import vault
 
 
 logging.basicConfig(
@@ -107,6 +108,24 @@ def process(audio_path: Path) -> None:
     if proposals:
         log.info("  %d ontology proposal(s) queued", len(proposals))
 
+    entities_raw = parsed.get("entities") if isinstance(parsed.get("entities"), list) else []
+    entities = db.save_entities(rec_id, entities_raw)
+    if entities:
+        log.info("  %d entit%s extracted", len(entities), "y" if len(entities) == 1 else "ies")
+
+    try:
+        vault.write_reflection(
+            rec_id=rec_id,
+            recorded_at=_recorded_at_from_path(audio_path),
+            source="voice",
+            transcript=t["text"],
+            parsed=parsed,
+            entities=entities,
+            acoustic=a,
+        )
+    except Exception:
+        log.warning("vault write failed for rec=%s", rec_id, exc_info=True)
+
     log.info("✓ done: %s", audio_path.name)
 
 
@@ -147,6 +166,25 @@ def process_note(note: dict) -> None:
             db.save_proposal(rec_id, prop.get("file", ""), prop.get("section", ""), prop.get("proposal", ""))
     if proposals:
         log.info("  %d ontology proposal(s) queued", len(proposals))
+
+    entities_raw = parsed.get("entities") if isinstance(parsed.get("entities"), list) else []
+    entities = db.save_entities(rec_id, entities_raw)
+    if entities:
+        log.info("  %d entit%s extracted", len(entities), "y" if len(entities) == 1 else "ies")
+
+    try:
+        vault.write_reflection(
+            rec_id=rec_id,
+            recorded_at=note["modified_dt"],
+            source="note",
+            transcript=body,
+            parsed=parsed,
+            entities=entities,
+            acoustic=None,
+            note_title=note["title"],
+        )
+    except Exception:
+        log.warning("vault write failed for note rec=%s", rec_id, exc_info=True)
 
     log.info("✓ done: note %s", note["title"])
 

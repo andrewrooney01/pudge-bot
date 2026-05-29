@@ -27,8 +27,23 @@ CONFIG_DIR = PROJECT / "config"
 
 DB_PATH = DATA_DIR / "orb.db"
 LENS_PATH = CONFIG_DIR / "lens.md"
-ONTOLOGY_DIR = CONFIG_DIR / "ontology"
-ARTIFACTS_DIR = ONTOLOGY_DIR / "artifacts"
+
+# VAULT_DIR is the Obsidian-side root: ontology files at the top, plus
+# auto-maintained journal/ and entities/ subtrees the orb writes into.
+# Default picks config/pudge-bot/ if it's populated with a live identity.md
+# (the user's actual vault), falling back to config/ontology/ for fresh
+# clones. Override in config_local.py to point elsewhere.
+def _default_vault() -> Path:
+    candidate = CONFIG_DIR / "pudge-bot"
+    if (candidate / "identity.md").exists():
+        return candidate
+    return CONFIG_DIR / "ontology"
+
+VAULT_DIR = _default_vault()
+ONTOLOGY_DIR = VAULT_DIR
+ARTIFACTS_DIR = VAULT_DIR / "artifacts"
+JOURNAL_DIR = VAULT_DIR / "journal"
+ENTITIES_DIR = VAULT_DIR / "entities"
 
 WHISPER_MODEL = "mlx-community/whisper-large-v3-turbo"
 
@@ -45,5 +60,5 @@ try:
 except ImportError:
     pass
 
-for d in (DATA_DIR, LOGS_DIR, CONFIG_DIR, ONTOLOGY_DIR, ARTIFACTS_DIR):
+for d in (DATA_DIR, LOGS_DIR, CONFIG_DIR, VAULT_DIR, ARTIFACTS_DIR, JOURNAL_DIR, ENTITIES_DIR):
     d.mkdir(parents=True, exist_ok=True)
